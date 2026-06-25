@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="50dp"
+    android:layout_margin="1dp"
+    android:background="@android:color/transparent">
+
+    <TextView
+        android:id="@+id/tvDayNumber"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="1"
+        android:textSize="16sp" />
+
+    <!-- 选中框 -->
+    <View
+        android:id="@+id/viewSelectionBorder"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/selection_border"
+        android:visibility="gone" />
+
+    <!-- 🔥 预测标记 - 缩小尺寸，不遮挡日期 -->
+    <TextView
+        android:id="@+id/tvPredictMark"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="1dp"
+        android:layout_marginEnd="1dp"
+        android:text="✓"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:background="@drawable/predict_circle_small"
+        android:visibility="gone" />
+
+</FrameLayout>

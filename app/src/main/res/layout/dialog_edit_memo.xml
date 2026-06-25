@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- 颜色选择 -->
+        <TextView
+            android:id="@+id/tvColorTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="选择颜色标注"
+            android:textSize="14sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="8dp" />
+
+        <RadioGroup
+            android:id="@+id/rgColors"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/rbNone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="无"
+                android:layout_marginEnd="12dp" />
+
+            <RadioButton
+                android:id="@+id/rbRed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔴 红"
+                android:textColor="#E74C3C"
+                android:layout_marginEnd="12dp" />
+
+            <RadioButton
+                android:id="@+id/rbGreen"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🟢 绿"
+                android:textColor="#27AE60" />
+
+        </RadioGroup>
+
+        <!-- 分隔线 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#DDDDDD"
+            android:layout_marginBottom="16dp" />
+
+        <!-- 结构化表单 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📊 做T记录"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 1. 黄白线 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="1. 黄白线"
+            android:textSize="13sp"
+            android:textColor="#555555"
+            android:layout_marginBottom="4dp" />
+
+        <RadioGroup
+            android:id="@+id/rgYellowWhite"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="12dp">
+
+            <RadioButton
+                android:id="@+id/rbYellowUp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🟡 黄上白下"
+                android:textColor="#333333"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/rbWhiteUp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⬜ 白上黄下"
+                android:textColor="#333333"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/rbYellowWhiteNone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textColor="#999999" />
+
+        </RadioGroup>
+
+        <!-- 2. IOPV -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="2. IOPV"
+            android:textSize="13sp"
+            android:textColor="#555555"
+            android:layout_marginBottom="4dp" />
+
+        <RadioGroup
+            android:id="@+id/rgIopv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="12dp">
+
+            <RadioButton
+                android:id="@+id/rbPremium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📈 溢价"
+                android:textColor="#E74C3C"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/rbDiscount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📉 折价"
+                android:textColor="#27AE60"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/rbIopvNone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textColor="#999999" />
+
+        </RadioGroup>
+
+        <!-- 3. 涨跌家数 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="3. 涨跌家数"
+            android:textSize="13sp"
+            android:textColor="#555555"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/etMarketCount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="输入上涨家数，如：2500"
+            android:inputType="number"
+            android:padding="8dp"
+            android:background="@drawable/edit_text_border"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 4. 操作 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="4. 操作"
+            android:textSize="13sp"
+            android:textColor="#555555"
+            android:layout_marginBottom="4dp" />
+
+        <RadioGroup
+            android:id="@+id/rgAction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="12dp">
+
+            <RadioButton
+                android:id="@+id/rbLongT"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📈 正T (先买后卖)"
+                android:textColor="#27AE60"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/rbShortT"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📉 倒T (先卖后买)"
+                android:textColor="#E74C3C"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/rbActionNone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textColor="#999999" />
+
+        </RadioGroup>
+
+        <!-- 5. 北向资金 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="5. 北向资金"
+            android:textSize="13sp"
+            android:textColor="#555555"
+            android:layout_marginBottom="4dp" />
+
+        <RadioGroup
+            android:id="@+id/rgNorth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="12dp">
+
+            <RadioButton
+                android:id="@+id/rbNorthIn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🟢 流入"
+                android:textColor="#27AE60"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/rbNorthOut"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔴 流出"
+                android:textColor="#E74C3C"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/rbNorthTurn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔄 拐头"
+                android:textColor="#FF9800"
+                android:layout_marginEnd="16dp" />
+
+            <RadioButton
+                android:id="@+id/rbNorthNone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textColor="#999999" />
+
+        </RadioGroup>
+
+        <!-- 分隔线 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#DDDDDD"
+            android:layout_marginBottom="16dp" />
+
+        <!-- 详细记录标题 -->
+        <TextView
+            android:id="@+id/tvRemarkTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📝 详细记录"
+            android:textSize="14sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="8dp" />
+
+        <!-- 详细记录输入框 -->
+        <EditText
+            android:id="@+id/etRemarkInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minLines="4"
+            android:gravity="top|start"
+            android:hint="写点今天有趣的观察和总结吧..."
+            android:inputType="textMultiLine"
+            android:padding="8dp"
+            android:background="@drawable/edit_text_border" />
+
+        <!-- 🔥 一个换行（16dp） -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="16dp" />
+
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">别吵，我在思考</string>
+    <string name="button_edit_color">编辑颜色</string>
+    <string name="button_edit_remark">添加备注</string>
+</resources>
