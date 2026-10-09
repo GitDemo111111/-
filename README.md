@@ -234,6 +234,32 @@ cd build/web && python -m http.server 8088
 > 生日提醒需要装手机版才会真正弹通知。功能逻辑（生日计算、农历、倒计时、筛选排序、
 > 导入导出）与手机端完全一致。
 
+### 用手机直接体验（不用装 APK）
+
+让服务监听所有网卡，手机和电脑连同一个 Wi-Fi 就能打开：
+
+```powershell
+# 绑到 0.0.0.0，并换成你电脑的局域网 IP
+cd build\web
+python -m http.server 8088 --bind 0.0.0.0
+# 查本机局域网 IP：ipconfig  或  Get-NetIPAddress -AddressFamily IPv4
+```
+
+然后在手机浏览器打开 `http://<电脑局域网IP>:8088/`。
+Chrome 里点「添加到主屏幕」后会以独立窗口打开，用起来和 App 差不多。
+
+### 用手机下载安装 APK
+
+构建出 APK 之后，用仓库里的脚本把它共享给手机（会自动生成一个下载页）：
+
+```powershell
+pwsh -ExecutionPolicy Bypass -File tool/serve_apk.ps1
+# 终端会打印形如  http://192.168.0.239:8090/  的地址
+```
+
+手机打开那个地址 → 点「下载 APK 并安装」→ 允许「安装未知应用」即可。
+脚本同时会显示版本、大小、构建时间和 SHA256，便于核对是不是最新包。
+
 > **关于 Android 构建配置**：`flutter_local_notifications` 要求 `compileSdk >= 35`、`minSdk >= 24`，
 > 并且必须开启 Java 8+ API 反糖化（desugaring）。这些都已经配置在
 > `android/app/build.gradle.kts` 里，通知权限与接收器配置在 `android/app/src/main/AndroidManifest.xml`。
@@ -298,10 +324,10 @@ git push origin v1.0.1
 推代码前先本地跑一遍，和 CI 完全一致：
 
 ```powershell
-# Windows
-pwsh -File tool/ci.ps1
-pwsh -File tool/ci.ps1 -SkipBuild                     # 只检查不构建
-pwsh -File tool/ci.ps1 -JavaHome "D:\Android Studio\jbr"
+# Windows（ExecutionPolicy 受限时必须带 -ExecutionPolicy Bypass）
+pwsh -ExecutionPolicy Bypass -File tool/ci.ps1
+pwsh -ExecutionPolicy Bypass -File tool/ci.ps1 -SkipBuild     # 只检查不构建
+pwsh -ExecutionPolicy Bypass -File tool/ci.ps1 -JavaHome "D:\Android Studio\jbr"
 ```
 
 ```bash
@@ -309,6 +335,11 @@ pwsh -File tool/ci.ps1 -JavaHome "D:\Android Studio\jbr"
 ./tool/ci.sh
 ./tool/ci.sh --skip-build
 ```
+
+> **注意**：`tool/*.ps1` 里带中文，**必须保存为「UTF-8 with BOM」**。
+> Windows PowerShell 5.1 对没有 BOM 的脚本会按 GBK 解码，中文注释会把文件解析坏，
+> 报出莫名其妙的 `The string is missing the terminator`。用 VS Code / Notepad++ 改这两个
+> 文件时请保持 BOM（Notepad++ 里选「编码 → 以 UTF-8-BOM 编码」）。
 
 ---
 
@@ -457,4 +488,34 @@ Execution failed for task ':app:processReleaseResources'.
 
 > 代码本身、测试、CI 都已经完整验证过；本地出不了 APK 纯粹是这台机器的加密软件导致的。
 > 好消息是 Dart 侧完全不受影响 —— 所以 `flutter analyze` 和 `flutter test` 在本机都是全绿的。
+
+### 4. 关于「别人的工具能出 APK」
+
+这台机器 2026 年 6 月还在 `D:\Android\calendar_app\build\app\outputs\flutter-apk\` 里留下过
+构建成功的 Flutter APK，说明当时是能构建的 —— 该加密软件是后来才生效/收紧的。
+
+另外两种「能拿到 APK」的情形，和本机的构建能力无关：
+
+- **云端 Agent / CI 构建**：那种环境的操作系统里没有这个加密软件，所以 AGP 能正常读 `R.txt`。
+  本仓库的 `.github/workflows/ci.yml` 就是干这个的（见下）。
+- **在 IT 把 JDK 加入白名单之后构建**：那就是本机自己构建，等于「解决办法 1」。
+
+#### 用 GitHub Actions 出 APK（本机 SSH 到 GitHub 是通的）
+
+```powershell
+# 1) 先在 GitHub 上建一个空仓库（私有即可），例如 birthday-keeper
+# 2) 关联并推送（走 SSH，本机 https://github.com 不通但 ssh 可以）
+cd <本工程目录>
+git remote add origin git@github.com:<你的用户名>/birthday-keeper.git
+git push -u origin main
+```
+
+推送后 GitHub Actions 会自动跑 `ci.yml`：先格式检查 + 静态分析 + 271 个测试，
+再构建 Release APK / AAB 与 Web 产物，最后在 Android 模拟器上跑集成测试。
+构建好的 APK 在该仓库的 **Actions → 对应运行 → Artifacts** 里下载
+（`birthday-keeper-android`），这就是「在网页端下载 APK」。
+
+> 打标签发布正式包：`git tag v1.0.1 && git push origin v1.0.1`，
+> `release.yml` 会把带版本号的 APK/AAB 直接挂到 GitHub Release 上。
+
 

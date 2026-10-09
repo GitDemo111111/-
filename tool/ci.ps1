@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   本地 CI：格式检查 -> 静态分析 -> 测试 -> 构建 Release APK/AAB。
 
