@@ -96,7 +96,7 @@ void main() {
     await harness.load();
     await pumpContacts(tester, harness);
 
-    await tester.tap(find.byKey(const Key('relationFilter-同事')));
+    await tester.tap(find.byKey(const Key('relationFilter-colleague')));
     await tester.pumpAndSettle();
 
     expect(find.byType(ContactTile), findsOneWidget);

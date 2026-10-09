@@ -46,6 +46,9 @@ jobs:
       - name: 构建 Release APK
         run: flutter build apk --release
 
+      - name: 构建分架构 APK（体积小很多，装的时候选对自己的手机那一份）
+        run: flutter build apk --release --split-per-abi
+
       - name: 构建 Release AAB
         run: flutter build appbundle --release
 
@@ -55,6 +58,10 @@ jobs:
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk \
              "dist/birthday-keeper-${VERSION}.apk"
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+             "dist/birthday-keeper-${VERSION}-arm64-v8a.apk"
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+             "dist/birthday-keeper-${VERSION}-armeabi-v7a.apk"
           cp build/app/outputs/bundle/release/app-release.aab \
              "dist/birthday-keeper-${VERSION}.aab"
           ls -lh dist

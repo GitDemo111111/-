@@ -4,7 +4,8 @@ import '../core/date_x.dart';
 
 /// 生日所使用的历法。
 enum BirthdayCalendar {
-  solar('公历'),
+  /// 新历（也叫公历 / 阳历）。界面上统一叫「新历」。
+  solar('新历'),
   lunar('农历');
 
   const BirthdayCalendar(this.label);

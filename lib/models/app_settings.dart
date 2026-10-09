@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import 'birthday.dart';
 import 'contact.dart';
 
 /// 联系人列表的排序方式。
@@ -29,6 +30,9 @@ class AppSettings {
     this.sortMode = ContactSortMode.daysUntil,
     this.showLunarInfo = true,
     this.groupUpcoming = true,
+    this.showTipCard = true,
+    this.hiddenTipIds = const <String>[],
+    this.importCalendar = BirthdayCalendar.lunar,
   });
 
   /// 总开关：关闭后不再调度任何通知。
@@ -45,18 +49,35 @@ class AppSettings {
   /// 「即将到来」页是否按时间分组展示。
   final bool groupUpcoming;
 
+  /// 是否在首页显示「使用提示」卡片。
+  final bool showTipCard;
+
+  /// 被用户「不再提示」的提示 id。
+  final List<String> hiddenTipIds;
+
+  /// 文本导入时，没有写明历法的日期按哪种历法理解（默认农历）。
+  final BirthdayCalendar importCalendar;
+
+  bool isTipHidden(String id) => hiddenTipIds.contains(id);
+
   AppSettings copyWith({
     bool? notificationsEnabled,
     ReminderSettings? defaultReminder,
     ContactSortMode? sortMode,
     bool? showLunarInfo,
     bool? groupUpcoming,
+    bool? showTipCard,
+    List<String>? hiddenTipIds,
+    BirthdayCalendar? importCalendar,
   }) => AppSettings(
     notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
     defaultReminder: defaultReminder ?? this.defaultReminder,
     sortMode: sortMode ?? this.sortMode,
     showLunarInfo: showLunarInfo ?? this.showLunarInfo,
     groupUpcoming: groupUpcoming ?? this.groupUpcoming,
+    showTipCard: showTipCard ?? this.showTipCard,
+    hiddenTipIds: hiddenTipIds ?? this.hiddenTipIds,
+    importCalendar: importCalendar ?? this.importCalendar,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -65,6 +86,9 @@ class AppSettings {
     'sortMode': sortMode.name,
     'showLunarInfo': showLunarInfo,
     'groupUpcoming': groupUpcoming,
+    'showTipCard': showTipCard,
+    'hiddenTipIds': hiddenTipIds,
+    'importCalendar': importCalendar.name,
   };
 
   factory AppSettings.fromJson(Map<String, Object?> json) {
@@ -74,6 +98,9 @@ class AppSettings {
     final Object? notificationsEnabled = json['notificationsEnabled'];
     final Object? showLunarInfo = json['showLunarInfo'];
     final Object? groupUpcoming = json['groupUpcoming'];
+    final Object? showTipCard = json['showTipCard'];
+    final Object? hiddenTipIds = json['hiddenTipIds'];
+    final Object? importCalendar = json['importCalendar'];
     return AppSettings(
       notificationsEnabled: notificationsEnabled is bool
           ? notificationsEnabled
@@ -90,6 +117,13 @@ class AppSettings {
       groupUpcoming: groupUpcoming is bool
           ? groupUpcoming
           : fallback.groupUpcoming,
+      showTipCard: showTipCard is bool ? showTipCard : fallback.showTipCard,
+      hiddenTipIds: hiddenTipIds is List
+          ? hiddenTipIds.whereType<String>().toList()
+          : fallback.hiddenTipIds,
+      importCalendar: importCalendar is String
+          ? BirthdayCalendar.fromName(importCalendar)
+          : fallback.importCalendar,
     );
   }
 
@@ -101,7 +135,18 @@ class AppSettings {
           other.defaultReminder == defaultReminder &&
           other.sortMode == sortMode &&
           other.showLunarInfo == showLunarInfo &&
-          other.groupUpcoming == groupUpcoming;
+          other.groupUpcoming == groupUpcoming &&
+          other.showTipCard == showTipCard &&
+          _sameList(other.hiddenTipIds, hiddenTipIds) &&
+          other.importCalendar == importCalendar;
+
+  static bool _sameList(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   @override
   int get hashCode => Object.hash(
@@ -110,5 +155,8 @@ class AppSettings {
     sortMode,
     showLunarInfo,
     groupUpcoming,
+    showTipCard,
+    Object.hashAll(hiddenTipIds),
+    importCalendar,
   );
 }

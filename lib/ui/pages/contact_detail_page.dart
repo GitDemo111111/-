@@ -367,7 +367,7 @@ class _CountdownCard extends StatelessWidget {
               _InfoPill(
                 text: birthday.isLunar
                     ? birthday.shortLabel
-                    : '公历${birthday.shortLabel}',
+                    : '新历${birthday.shortLabel}',
               ),
               if (showLunar && birthday.isSolar && lunarDate != null)
                 _InfoPill(text: lunarDate!.label),

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import 'state/contact_controller.dart';
+import 'state/root_tab_controller.dart';
 import 'state/settings_controller.dart';
 import 'theme/app_theme.dart';
 import 'ui/pages/root_page.dart';
@@ -16,10 +17,14 @@ class BirthdayKeeperApp extends StatelessWidget {
     super.key,
     required this.contactController,
     required this.settingsController,
+    this.rootTabController,
   });
 
   final ContactController contactController;
   final SettingsController settingsController;
+
+  /// 底部导航状态；不传就自己建一个（测试里可以直接断言它）。
+  final RootTabController? rootTabController;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +35,9 @@ class BirthdayKeeperApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<ContactController>.value(
           value: contactController,
+        ),
+        ChangeNotifierProvider<RootTabController>.value(
+          value: rootTabController ?? RootTabController(),
         ),
       ],
       child: MaterialApp(

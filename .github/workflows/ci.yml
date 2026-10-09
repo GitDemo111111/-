@@ -79,6 +79,9 @@ jobs:
       - name: 构建 Release APK
         run: flutter build apk --release
 
+      - name: 构建分架构 APK（体积更小，便于下载）
+        run: flutter build apk --release --split-per-abi
+
       - name: 构建 Release AAB（用于上架）
         run: flutter build appbundle --release
 

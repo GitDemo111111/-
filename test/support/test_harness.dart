@@ -6,6 +6,7 @@ import 'package:birthday_keeper/data/contact_repository.dart';
 import 'package:birthday_keeper/data/settings_repository.dart';
 import 'package:birthday_keeper/services/reminder_scheduler.dart';
 import 'package:birthday_keeper/state/contact_controller.dart';
+import 'package:birthday_keeper/state/root_tab_controller.dart';
 import 'package:birthday_keeper/state/settings_controller.dart';
 import 'package:birthday_keeper/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -133,6 +134,7 @@ class TestHarness {
   late final NoopReminderScheduler scheduler;
   late final SettingsController settingsController;
   late final ContactController contactController;
+  late final RootTabController rootTabController = RootTabController();
 
   DateTime get now => _now;
 
@@ -151,6 +153,9 @@ class TestHarness {
         ),
         ChangeNotifierProvider<ContactController>.value(
           value: contactController,
+        ),
+        ChangeNotifierProvider<RootTabController>.value(
+          value: rootTabController,
         ),
       ],
       child: MaterialApp(

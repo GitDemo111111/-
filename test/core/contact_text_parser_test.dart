@@ -5,7 +5,11 @@ import 'package:birthday_keeper/models/relationship.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // 默认历法是农历（用户要求）；需要新历时显式指定或写「新历」。
   const ContactTextParser parser = ContactTextParser();
+  const ContactTextParser solarParser = ContactTextParser(
+    defaultCalendar: BirthdayCalendar.solar,
+  );
 
   ParsedContact one(String text) {
     final List<ParsedContact> all = parser.parse(text);
@@ -67,9 +71,17 @@ void main() {
       expect(one('姓名王五').name, '王五');
       expect(
         one('生日是1995年5月20日').birthday,
-        const Birthday(year: 1995, month: 5, day: 20),
+        const Birthday(
+          year: 1995,
+          month: 5,
+          day: 20,
+          calendar: BirthdayCalendar.lunar,
+        ),
       );
-      expect(one('生日 5月20日').birthday, const Birthday(month: 5, day: 20));
+      expect(
+        one('生日 5月20日').birthday,
+        const Birthday(month: 5, day: 20, calendar: BirthdayCalendar.lunar),
+      );
       expect(one('手机13800000000').phone, '13800000000');
       expect(one('微信zhangsan').wechat, 'zhangsan');
     });
@@ -140,7 +152,7 @@ void main() {
   });
 
   group('生日解析', () {
-    test('多种数字写法', () {
+    test('多种数字写法（显式新历）', () {
       for (final String text in <String>[
         '1995-05-20',
         '1995/5/20',
@@ -148,7 +160,7 @@ void main() {
         '1995年5月20日',
       ]) {
         expect(
-          one('姓名：张三\n生日：$text').birthday,
+          solarParser.parse('姓名：张三\n生日：$text').single.birthday,
           const Birthday(year: 1995, month: 5, day: 20),
           reason: text,
         );
@@ -162,6 +174,7 @@ void main() {
         expect(b!.month, 5, reason: text);
         expect(b.day, 20, reason: text);
         expect(b.year, isNull, reason: text);
+        expect(b.calendar, BirthdayCalendar.lunar, reason: text);
       }
     });
 
@@ -220,13 +233,13 @@ void main() {
     });
 
     test('非法日期会给出提示', () {
-      final ParsedContact c = one('姓名：张三\n生日：2月30日');
+      final ParsedContact c = one('姓名：张三\n生日：新历2月30日');
       expect(c.birthday, isNull);
       expect(c.warnings, isNotEmpty);
     });
 
     test('2 月 29 日在闰年是合法的', () {
-      final ParsedContact c = one('姓名：张三\n生日：2000-02-29');
+      final ParsedContact c = one('姓名：张三\n生日：新历2000-02-29');
       expect(c.birthday, const Birthday(year: 2000, month: 2, day: 29));
       expect(c.warnings, isEmpty);
     });
@@ -245,9 +258,20 @@ void main() {
       final List<ParsedContact> all = parser.parse(two);
       expect(all, hasLength(2));
       expect(all[0].name, '张三');
-      expect(all[0].birthday, const Birthday(year: 1995, month: 5, day: 20));
+      expect(
+        all[0].birthday,
+        const Birthday(
+          year: 1995,
+          month: 5,
+          day: 20,
+          calendar: BirthdayCalendar.lunar,
+        ),
+      );
       expect(all[1].name, '李四');
-      expect(all[1].birthday, const Birthday(month: 6, day: 1));
+      expect(
+        all[1].birthday,
+        const Birthday(month: 6, day: 1, calendar: BirthdayCalendar.lunar),
+      );
       expect(all[1].hobbies, <String>['音乐']);
     });
 
@@ -270,7 +294,10 @@ void main() {
       final List<ParsedContact> all = parser.parse('姓名：张三\n\n生日：5月20日');
       expect(all, hasLength(1));
       expect(all.single.name, '张三');
-      expect(all.single.birthday, const Birthday(month: 5, day: 20));
+      expect(
+        all.single.birthday,
+        const Birthday(month: 5, day: 20, calendar: BirthdayCalendar.lunar),
+      );
     });
 
     test('parseValid 会过滤掉缺姓名的条目', () {
@@ -284,14 +311,20 @@ void main() {
     test('第一行当姓名，找得到日期就当生日，其余进备注', () {
       final ParsedContact c = one('张三\n5月20日\n喜欢喝咖啡');
       expect(c.name, '张三');
-      expect(c.birthday, const Birthday(month: 5, day: 20));
+      expect(
+        c.birthday,
+        const Birthday(month: 5, day: 20, calendar: BirthdayCalendar.lunar),
+      );
       expect(c.notes, '喜欢喝咖啡');
       expect(c.warnings, isNotEmpty);
     });
 
     test('第一行本身就是日期时不会当成姓名', () {
       final ParsedContact c = parser.parse('5月20日\n张三').single;
-      expect(c.birthday, const Birthday(month: 5, day: 20));
+      expect(
+        c.birthday,
+        const Birthday(month: 5, day: 20, calendar: BirthdayCalendar.lunar),
+      );
       expect(c.name, '张三');
     });
   });
@@ -346,7 +379,95 @@ void main() {
     test('Windows 下常见的多余空白与制表符', () {
       final ParsedContact c = one('\t姓名：张三  \n\t生日：5月20日\t');
       expect(c.name, '张三');
-      expect(c.birthday, const Birthday(month: 5, day: 20));
+      expect(
+        c.birthday,
+        const Birthday(month: 5, day: 20, calendar: BirthdayCalendar.lunar),
+      );
+    });
+  });
+
+  group('默认历法（默认农历）', () {
+    test('没写历法时按农历理解', () {
+      expect(
+        one('姓名：张三\n生日：1995-05-20').birthday,
+        const Birthday(
+          year: 1995,
+          month: 5,
+          day: 20,
+          calendar: BirthdayCalendar.lunar,
+        ),
+      );
+      expect(one('姓名：张三\n生日：5月20日').birthday!.calendar, BirthdayCalendar.lunar);
+    });
+
+    test('写成「新历」就按新历理解', () {
+      expect(
+        one('姓名：张三\n生日：新历1995-05-20').birthday,
+        const Birthday(year: 1995, month: 5, day: 20),
+      );
+      // 公历 / 阳历 / 西历 这些同义写法也认
+      for (final String keyword in <String>['公历', '阳历', '西历', 'solar']) {
+        final Birthday? b = one('姓名：张三\n生日：${keyword}5月20日').birthday;
+        expect(b!.calendar, BirthdayCalendar.solar, reason: keyword);
+      }
+    });
+
+    test('默认历法可以按需切换（导入页的开关）', () {
+      const ContactTextParser solarDefault = ContactTextParser(
+        defaultCalendar: BirthdayCalendar.solar,
+      );
+      final ParsedContact c = solarDefault.parse('姓名：张三\n生日：5月20日').single;
+      expect(c.birthday!.calendar, BirthdayCalendar.solar);
+      // 但文本里写了「农历」依然以文本为准
+      final ParsedContact forced = solarDefault
+          .parse('姓名：张三\n生日：农历八月十五')
+          .single;
+      expect(forced.birthday!.calendar, BirthdayCalendar.lunar);
+      expect(forced.birthday!.month, 8);
+    });
+  });
+
+  group('关系：家人包含具体角色', () {
+    test('爸爸 / 妈妈 / 爷爷 等直接可选', () {
+      expect(one('姓名：张三\n关系：爸爸').relationship, Relationship.father);
+      expect(one('姓名：张三\n关系：妈妈').relationship, Relationship.mother);
+      expect(one('姓名：张三\n关系：爷爷').relationship, Relationship.grandpa);
+      expect(one('姓名：张三\n关系：奶奶').relationship, Relationship.grandma);
+      expect(one('姓名：张三\n关系：外公').relationship, Relationship.maternalGrandpa);
+      expect(one('姓名：张三\n关系：外婆').relationship, Relationship.maternalGrandma);
+      expect(one('姓名：张三\n关系：老公').relationship, Relationship.husband);
+      expect(one('姓名：张三\n关系：老婆').relationship, Relationship.wife);
+      expect(one('姓名：张三\n关系：哥哥').relationship, Relationship.elderBrother);
+      expect(one('姓名：张三\n关系：妹妹').relationship, Relationship.youngerSister);
+    });
+
+    test('具体角色都归到正确的分组（筛选用）', () {
+      expect(Relationship.father.group, RelationshipGroup.family);
+      expect(Relationship.mother.group, RelationshipGroup.family);
+      expect(Relationship.grandpa.group, RelationshipGroup.family);
+      expect(Relationship.uncle.group, RelationshipGroup.relative);
+      expect(Relationship.bestie.group, RelationshipGroup.friend);
+      expect(Relationship.boss.group, RelationshipGroup.colleague);
+      expect(Relationship.classmate.group, RelationshipGroup.classmate);
+      expect(Relationship.teacher.group, RelationshipGroup.other);
+    });
+
+    test('口语化写法也能识别', () {
+      expect(one('姓名：张三\n关系：父亲').relationship, Relationship.father);
+      expect(one('姓名：张三\n关系：母亲').relationship, Relationship.mother);
+      expect(one('姓名：张三\n关系：姥爷').relationship, Relationship.maternalGrandpa);
+      expect(one('姓名：张三\n关系：姥姥').relationship, Relationship.maternalGrandma);
+      expect(one('姓名：张三\n关系：丈夫').relationship, Relationship.husband);
+      expect(one('姓名：张三\n关系：妻子').relationship, Relationship.wife);
+      expect(one('姓名：张三\n关系：老板').relationship, Relationship.boss);
+      expect(one('姓名：张三\n关系：好友').relationship, Relationship.friend);
+      expect(one('姓名：张三\n关系：表哥').relationship, Relationship.cousin);
+    });
+
+    test('实在认不出的还是当具体身份', () {
+      final ParsedContact c = one('姓名：张三\n关系：大学室友');
+      expect(c.relationship, isNull);
+      expect(c.relationLabel, '大学室友');
     });
   });
 
@@ -354,13 +475,19 @@ void main() {
     test('公历生日能推出星座', () {
       // 解析器本身只负责生日，星座由 BirthdayCalculator 推导。
       final ParsedContact c = one('姓名：张三\n生日：5月20日');
-      expect(c.birthday, const Birthday(month: 5, day: 20));
+      expect(
+        c.birthday,
+        const Birthday(month: 5, day: 20, calendar: BirthdayCalendar.lunar),
+      );
     });
 
     test('用户粘贴了星座也不会被当成字段（星座是算出来的）', () {
       final ParsedContact c = one('姓名：张三\n生日：5月20日\n星座：金牛座');
       expect(c.notes, contains('星座：金牛座'));
-      expect(c.birthday, const Birthday(month: 5, day: 20));
+      expect(
+        c.birthday,
+        const Birthday(month: 5, day: 20, calendar: BirthdayCalendar.lunar),
+      );
     });
   });
 }

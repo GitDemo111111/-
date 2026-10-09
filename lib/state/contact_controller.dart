@@ -28,13 +28,20 @@ class UpcomingGroup {
   final List<UpcomingBirthday> items;
 }
 
-/// 一个可用的筛选项（关系或爱好）。
+/// 一个可用的筛选项（关系分组或爱好）。
 @immutable
 class FilterOption {
-  const FilterOption({required this.label, required this.count});
+  const FilterOption({
+    required this.label,
+    required this.count,
+    this.relationshipGroup,
+  });
 
   final String label;
   final int count;
+
+  /// 关系分组筛选项对应的分组（爱好筛选项为 null）。
+  final RelationshipGroup? relationshipGroup;
 }
 
 /// 联系人与提醒的核心状态。
@@ -70,7 +77,7 @@ class ContactController extends ChangeNotifier {
   String? _loadError;
 
   String _query = '';
-  Relationship? _relationshipFilter;
+  RelationshipGroup? _relationshipFilter;
   final Set<String> _hobbyFilters = <String>{};
   bool _favoritesOnly = false;
 
@@ -90,7 +97,7 @@ class ContactController extends ChangeNotifier {
 
   BirthdayCalculator get calculator => _calculator;
   String get searchQuery => _query;
-  Relationship? get relationshipFilter => _relationshipFilter;
+  RelationshipGroup? get relationshipFilter => _relationshipFilter;
   Set<String> get hobbyFilters => Set<String>.unmodifiable(_hobbyFilters);
   bool get favoritesOnly => _favoritesOnly;
 
@@ -239,8 +246,9 @@ class ContactController extends ChangeNotifier {
     final String query = _query.trim().toLowerCase();
     final List<Contact> list = _contacts.where((Contact contact) {
       if (_favoritesOnly && !contact.favorite) return false;
+      // 按「分组」筛选：爸爸/妈妈/爷爷… 都算「家人」
       if (_relationshipFilter != null &&
-          contact.relationship != _relationshipFilter) {
+          contact.relationship?.group != _relationshipFilter) {
         return false;
       }
       if (_hobbyFilters.isNotEmpty &&
@@ -285,18 +293,21 @@ class ContactController extends ChangeNotifier {
     for (final Contact contact in _contacts) ...contact.hobbies,
   };
 
-  /// 可用的关系筛选项（只列出真正用到的）。
+  /// 可用的关系筛选项（按分组，只列出真正用到的）。
   List<FilterOption> get relationshipFacets {
-    final Map<Relationship, int> counts = <Relationship, int>{};
+    final Map<RelationshipGroup, int> counts = <RelationshipGroup, int>{};
     for (final Contact contact in _contacts) {
-      final Relationship? relationship = contact.relationship;
-      if (relationship == null) continue;
-      counts[relationship] = (counts[relationship] ?? 0) + 1;
+      final RelationshipGroup? group = contact.relationship?.group;
+      if (group == null) continue;
+      counts[group] = (counts[group] ?? 0) + 1;
     }
     final List<FilterOption> options = counts.entries
         .map(
-          (MapEntry<Relationship, int> e) =>
-              FilterOption(label: e.key.label, count: e.value),
+          (MapEntry<RelationshipGroup, int> e) => FilterOption(
+            label: e.key.label,
+            count: e.value,
+            relationshipGroup: e.key,
+          ),
         )
         .toList();
     options.sort(
@@ -368,6 +379,25 @@ class ContactController extends ChangeNotifier {
   }
 
   // ------------------------------------------------------------ 增删改
+
+  /// 找出与 [incoming] **信息完全一致**的已有联系人（同日同名同内容）。
+  ///
+  /// 导入时用它做自动合并：找到就不重复添加，直接沿用已有的那一条。
+  Contact? findIdentical(Contact incoming) {
+    for (final Contact existing in _contacts) {
+      if (existing.hasSameContent(incoming)) return existing;
+    }
+    return null;
+  }
+
+  /// 是否存在「同名但信息不同」的联系人。
+  bool hasSameNameDifferentContent(Contact incoming) {
+    final String name = incoming.name.trim().toLowerCase();
+    return _contacts.any(
+      (Contact c) =>
+          c.name.trim().toLowerCase() == name && !c.hasSameContent(incoming),
+    );
+  }
 
   Future<Contact> addContact(Contact contact) async {
     final Contact prepared = _prepare(contact);
@@ -456,7 +486,7 @@ class ContactController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setRelationshipFilter(Relationship? value) {
+  void setRelationshipFilter(RelationshipGroup? value) {
     if (_relationshipFilter == value) return;
     _relationshipFilter = value;
     _visibleCache = null;

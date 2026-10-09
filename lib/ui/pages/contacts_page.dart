@@ -180,18 +180,18 @@ class _FilterChips extends StatelessWidget {
           const SizedBox(width: 8),
           for (final FilterOption option in relations) ...<Widget>[
             SelectableChip(
-              key: Key('relationFilter-${option.label}'),
+              key: Key('relationFilter-${option.relationshipGroup?.name}'),
               label: '${option.label} ${option.count}',
               dense: true,
-              selected: controller.relationshipFilter?.label == option.label,
+              selected:
+                  controller.relationshipFilter == option.relationshipGroup,
               onTap: () {
-                final Relationship? current = controller.relationshipFilter;
+                final RelationshipGroup? current =
+                    controller.relationshipFilter;
                 controller.setRelationshipFilter(
-                  current?.label == option.label
+                  current == option.relationshipGroup
                       ? null
-                      : Relationship.values.firstWhere(
-                          (Relationship e) => e.label == option.label,
-                        ),
+                      : option.relationshipGroup,
                 );
               },
             ),

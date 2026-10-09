@@ -81,7 +81,7 @@ void main() {
 
       await paste(
         tester,
-        '姓名：李四\n关系：同事\n生日：1993-05-20\n手机：13900000000\n爱好：咖啡、徒步',
+        '姓名：李四\n关系：同事\n生日：新历1993-05-20\n手机：13900000000\n爱好：咖啡、徒步',
       );
 
       expect(find.text('李四'), findsOneWidget);
@@ -99,7 +99,7 @@ void main() {
       await harness.load();
       await pumpImport(tester, harness);
 
-      await paste(tester, '姓名：张三\n生日：5月20日\n\n姓名：李四\n生日：6月1日');
+      await paste(tester, '姓名：张三\n生日：新历5月20日\n\n姓名：李四\n生日：新历6月1日');
 
       expect(find.text('2 位可导入'), findsOneWidget);
       expect(find.byKey(const Key('importPreview-0')), findsOneWidget);
@@ -141,8 +141,8 @@ void main() {
       await harness.load();
       await pumpImport(tester, harness);
 
-      await paste(tester, '姓名：张三\n生日：5月20日');
-      expect(find.text('已有同名'), findsOneWidget);
+      await paste(tester, '姓名：张三\n生日：新历5月20日');
+      expect(find.text('已有同名，将新增'), findsOneWidget);
     });
 
     widgetTest('清空按钮会重置输入', (WidgetTester tester) async {
@@ -195,7 +195,7 @@ void main() {
       await harness.load();
       await pumpImport(tester, harness);
 
-      await paste(tester, '姓名：张三\n生日：5月20日\n\n姓名：李四\n生日：农历八月十五\n\n姓名：王五');
+      await paste(tester, '姓名：张三\n生日：新历5月20日\n\n姓名：李四\n生日：农历八月十五\n\n姓名：王五');
       expect(find.text('3 位可导入'), findsOneWidget);
 
       await tester.ensureVisible(find.byKey(const Key('doImportButton')));
@@ -219,7 +219,7 @@ void main() {
       await harness.load();
       await pumpImport(tester, harness);
 
-      await paste(tester, '姓名：张三\n生日：5月23日');
+      await paste(tester, '姓名：张三\n生日：新历5月23日');
       await tester.ensureVisible(find.byKey(const Key('doImportButton')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('doImportButton')));
@@ -245,7 +245,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // 直接打开对话框（通过编辑页的按钮在编辑页测试里覆盖）
-      final Future<ParsedContact?> future = showContactTextFillDialog(
+      final Future<ContactTextFillResult?> future = showContactTextFillDialog(
         tester.element(find.byType(Scaffold)),
       );
       await tester.pumpAndSettle();
@@ -255,7 +255,7 @@ void main() {
 
       await tester.enterText(
         find.byKey(const Key('fillTextField')),
-        '姓名：张三\n生日：5月20日',
+        '姓名：张三\n生日：新历5月20日',
       );
       await tester.pumpAndSettle();
 
@@ -265,9 +265,10 @@ void main() {
       await tester.tap(find.byKey(const Key('applyFillButton')));
       await tester.pumpAndSettle();
 
-      final ParsedContact? result = await future;
+      final ContactTextFillResult? result = await future;
       expect(result, isNotNull);
-      expect(result!.name, '张三');
+      expect(result!.contact, isNotNull);
+      expect(result.contact!.name, '张三');
     });
 
     widgetTest('没有姓名时填充按钮不可用', (WidgetTester tester) async {
@@ -276,7 +277,7 @@ void main() {
       await tester.pumpWidget(harness.wrap(const Scaffold()));
       await tester.pumpAndSettle();
 
-      final Future<ParsedContact?> future = showContactTextFillDialog(
+      final Future<ContactTextFillResult?> future = showContactTextFillDialog(
         tester.element(find.byType(Scaffold)),
       );
       await tester.pumpAndSettle();

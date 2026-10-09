@@ -217,6 +217,35 @@ class Contact {
     ?email,
   ].join(' ').toLowerCase();
 
+  /// 除 id / 时间戳 / 提醒设置以外的信息是否完全一致。
+  ///
+  /// 用于导入时判断「重复联系人」：同名且内容一致 -> 自动合并，不再新增一条。
+  /// 爱好、标签按集合比较，顺序不同也算一致。
+  bool hasSameContent(Contact other) {
+    bool sameSet(List<String> a, List<String> b) {
+      if (a.length != b.length) return false;
+      for (final String item in a) {
+        if (!b.contains(item)) return false;
+      }
+      return true;
+    }
+
+    return _trimmed(name)?.toLowerCase() ==
+            _trimmed(other.name)?.toLowerCase() &&
+        birthday == other.birthday &&
+        relationship == other.relationship &&
+        _trimmed(relationLabel) == _trimmed(other.relationLabel) &&
+        sameSet(hobbies, other.hobbies) &&
+        sameSet(tags, other.tags) &&
+        _trimmed(phone) == _trimmed(other.phone) &&
+        _trimmed(email) == _trimmed(other.email) &&
+        _trimmed(wechat) == _trimmed(other.wechat) &&
+        _trimmed(address) == _trimmed(other.address) &&
+        _trimmed(notes) == _trimmed(other.notes) &&
+        _trimmed(giftIdeas) == _trimmed(other.giftIdeas) &&
+        _trimmed(avatarEmoji) == _trimmed(other.avatarEmoji);
+  }
+
   static String? _trimmed(String? value) {
     if (value == null) return null;
     final String trimmed = value.trim();

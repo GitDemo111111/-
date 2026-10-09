@@ -8,7 +8,7 @@ import '../models/relationship.dart';
 const String kContactTextExample = '''姓名：张三
 关系：朋友
 身份：大学室友
-生日：1995-05-20
+生日：新历1995-05-20
 爱好：咖啡、徒步
 手机：13800000000
 微信：zhangsan_wx
@@ -22,10 +22,12 @@ const String kContactTextExample = '''姓名：张三
 const List<String> kContactTextRules = <String>[
   '一行一个字段，写成「字段：值」；冒号中英文都行。',
   '只有「姓名」是必填的，其它行不写就不填。',
-  '关系填内置的那几个（家人/亲戚/朋友/同事/同学/伴侣/客户/邻居/老师/其他）；'
-      '填别的会自动当作具体身份，例如「关系：大学室友」。',
+  '关系可以直接写爸爸 / 妈妈 / 爷爷 / 奶奶 / 老公 / 老婆 / 哥哥 / 姐姐 等，'
+      '也可以写朋友、同事、同学；填别的会自动当作具体身份。',
   '生日支持 1995-05-20、1995/5/20、1995年5月20日、5月20日、5-20 等写法。',
-  '农历生日写成「生日：农历八月十五」或「生日：农历腊月初八」，'
+  '没写明历法时按下面选的默认历法理解（默认农历）；要明确就写'
+      '「新历」或「农历」，例如「生日：新历1995-05-20」。',
+  '农历也可以写成中文：「生日：农历八月十五」「农历腊月初八」，'
       '中文数字、闰月（闰四月）都能识别。',
   '爱好、标签用「、」「,」「/」或空格分隔。',
   '多位联系人：用一行 --- 或空行隔开，每人从「姓名：」重新开始。',
@@ -121,7 +123,13 @@ class ParsedContact {
 /// 目标是让人把微信里收到的信息直接粘进来就能用，所以尽量容错：
 /// 标签有别名、冒号全角半角都行、日期多种写法、多个人用空行或 `---` 隔开。
 class ContactTextParser {
-  const ContactTextParser();
+  const ContactTextParser({this.defaultCalendar = BirthdayCalendar.lunar});
+
+  /// 文本里没写明历法时，按哪种历法理解。
+  ///
+  /// 默认**农历**（记长辈生日更常用）；写了「新历 / 公历 / 阳历」或「农历」
+  /// 的行会覆盖这个默认值。
+  final BirthdayCalendar defaultCalendar;
 
   /// 解析文本，返回所有解析出来的条目（含缺姓名的无效条目）。
   List<ParsedContact> parse(String text) {
@@ -265,7 +273,7 @@ class ContactTextParser {
       final String trimmed = value.trim();
       explicitCalendar = _parseCalendar(trimmed);
       if (explicitCalendar == null) {
-        warnings.add('没看懂历法「$trimmed」，已按公历处理');
+        warnings.add('没看懂历法「$trimmed」，已按新历处理');
       }
     }
 
@@ -279,7 +287,7 @@ class ContactTextParser {
         if (label.isEmpty) {
           // 没有冒号的行：可能夹带日期，先试着当生日。
           final Birthday? maybeDate = birthday == null
-              ? _parseBirthday(line, explicitCalendar ?? BirthdayCalendar.solar)
+              ? _parseBirthday(line, explicitCalendar ?? defaultCalendar)
               : null;
           if (maybeDate != null) {
             birthday = maybeDate;
@@ -313,7 +321,7 @@ class ContactTextParser {
           if (trimmed.isEmpty) break;
           final Birthday? parsed = _parseBirthday(
             trimmed,
-            explicitCalendar ?? BirthdayCalendar.solar,
+            explicitCalendar ?? defaultCalendar,
           );
           if (parsed == null) {
             warnings.add('没看懂生日「$trimmed」，请手动选择');
@@ -376,7 +384,7 @@ class ContactTextParser {
       if (name == null) {
         // 第一行当姓名；但如果它本身就是一个日期，就当作生日，
         // 避免把「5月20日」这样的行误当成名字。
-        final Birthday? asDate = _parseBirthday(line, BirthdayCalendar.solar);
+        final Birthday? asDate = _parseBirthday(line, defaultCalendar);
         if (asDate != null && asDate.validate() == null) {
           birthday ??= asDate;
           continue;
@@ -389,7 +397,7 @@ class ContactTextParser {
         }
       }
       if (birthday == null) {
-        final Birthday? parsed = _parseBirthday(line, BirthdayCalendar.solar);
+        final Birthday? parsed = _parseBirthday(line, defaultCalendar);
         if (parsed != null && parsed.validate() == null) {
           birthday = parsed;
           continue;
@@ -418,13 +426,20 @@ class ContactTextParser {
     required void Function(String) onFreeText,
   }) {
     if (value.isEmpty) return;
+    // 1) 常见同义写法（父亲 / 母亲 / 姥爷 / 丈夫 / 老板 …）
+    final Relationship? alias = _relationshipAliases[value];
+    if (alias != null) {
+      onEnum(alias);
+      return;
+    }
+    // 2) 内置标签或英文枚举名
     for (final Relationship item in Relationship.values) {
       if (item.label == value || item.name == value) {
         onEnum(item);
         return;
       }
     }
-    // 「朋友/同事」这类写法
+    // 3) 「朋友/同事」这类包含写法
     for (final Relationship item in Relationship.values) {
       if (value.contains(item.label)) {
         onEnum(item);
@@ -433,6 +448,48 @@ class ContactTextParser {
     }
     onFreeText(value);
   }
+
+  /// 关系的常见同义写法。
+  static const Map<String, Relationship> _relationshipAliases =
+      <String, Relationship>{
+        '父亲': Relationship.father,
+        '爸': Relationship.father,
+        '老爹': Relationship.father,
+        '母亲': Relationship.mother,
+        '妈': Relationship.mother,
+        '娘': Relationship.mother,
+        '祖父': Relationship.grandpa,
+        '祖母': Relationship.grandma,
+        '外祖父': Relationship.maternalGrandpa,
+        '姥爷': Relationship.maternalGrandpa,
+        '外祖母': Relationship.maternalGrandma,
+        '姥姥': Relationship.maternalGrandma,
+        '丈夫': Relationship.husband,
+        '妻子': Relationship.wife,
+        '媳妇': Relationship.wife,
+        '爱人': Relationship.partner,
+        '对象': Relationship.partner,
+        '男朋友': Relationship.partner,
+        '女朋友': Relationship.partner,
+        '闺女': Relationship.daughter,
+        '大哥': Relationship.elderBrother,
+        '大姐': Relationship.elderSister,
+        '小弟': Relationship.youngerBrother,
+        '小妹': Relationship.youngerSister,
+        '老板': Relationship.boss,
+        '上司': Relationship.boss,
+        '好友': Relationship.friend,
+        '发小': Relationship.friend,
+        '闺密': Relationship.bestie,
+        '舅': Relationship.maternalUncle,
+        '舅妈': Relationship.maternalUncle,
+        '姑妈': Relationship.paternalAunt,
+        '姨妈': Relationship.aunt,
+        '表哥': Relationship.cousin,
+        '表姐': Relationship.cousin,
+        '堂哥': Relationship.cousin,
+        '堂姐': Relationship.cousin,
+      };
 
   // ------------------------------------------------------------ 小工具
 
@@ -451,7 +508,7 @@ class ContactTextParser {
   }
 
   /// 把一行拆成「标签, 值」。支持两种写法：
-  /// 1. `生日：1995-05-20`（有分隔符）
+  /// 1. `生日：新历1995-05-20`（有分隔符）
   /// 2. `生日是1995-05-20`、`手机13800000000`（标签直接连值）
   static (String, String) _splitLabel(String line) {
     final Match? match = _colonPattern.firstMatch(line);

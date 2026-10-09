@@ -536,7 +536,7 @@ void main() {
       final TestHarness harness = buildHarness();
       await harness.load();
 
-      harness.contactController.setRelationshipFilter(Relationship.friend);
+      harness.contactController.setRelationshipFilter(RelationshipGroup.friend);
       expect(harness.contactController.visibleContacts, hasLength(2));
 
       harness.contactController.setRelationshipFilter(null);
@@ -570,7 +570,7 @@ void main() {
       await harness.load();
 
       harness.contactController.setQuery('李');
-      harness.contactController.setRelationshipFilter(Relationship.friend);
+      harness.contactController.setRelationshipFilter(RelationshipGroup.friend);
       harness.contactController.toggleHobbyFilter('徒步');
       harness.contactController.setFavoritesOnly(true);
       expect(harness.contactController.hasActiveFilters, isTrue);

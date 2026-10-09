@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../state/root_tab_controller.dart';
 import 'contacts_page.dart';
 import 'settings_page.dart';
 import 'upcoming_page.dart';
@@ -13,13 +15,12 @@ class RootPage extends StatefulWidget {
 }
 
 class _RootPageState extends State<RootPage> {
-  int _index = 0;
-
   @override
   Widget build(BuildContext context) {
+    final RootTabController tabs = context.watch<RootTabController>();
     return Scaffold(
       body: IndexedStack(
-        index: _index,
+        index: tabs.index,
         children: const <Widget>[
           UpcomingPage(),
           ContactsPage(),
@@ -27,8 +28,8 @@ class _RootPageState extends State<RootPage> {
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (int index) => setState(() => _index = index),
+        selectedIndex: tabs.index,
+        onDestinationSelected: tabs.goTo,
         destinations: const <NavigationDestination>[
           NavigationDestination(
             icon: Icon(Icons.cake_outlined),

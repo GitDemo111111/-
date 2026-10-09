@@ -8,12 +8,15 @@ import '../../models/contact.dart';
 import '../../models/hobbies.dart';
 import '../../models/relationship.dart';
 import '../../state/contact_controller.dart';
+import '../../state/root_tab_controller.dart';
+import '../../state/settings_controller.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/visuals.dart';
 import '../navigation.dart';
 import '../widgets/birthday_facts.dart';
 import '../widgets/contact_text_help.dart';
 import '../widgets/forms.dart';
+import 'contact_import_page.dart';
 
 /// 新建 / 编辑联系人。
 ///
@@ -55,6 +58,10 @@ class _ContactEditPageState extends State<ContactEditPage> {
   final TextEditingController _giftIdeas = TextEditingController();
 
   Relationship? _relationship;
+
+  /// 关系选择器当前展开的分组（二级选择：先选组，再选具体角色）。
+  RelationshipGroup? _relationGroup = RelationshipGroup.family;
+
   BirthdayCalendar _calendar = BirthdayCalendar.solar;
   DateTime? _solarDate;
   bool _yearUnknown = false;
@@ -103,6 +110,7 @@ class _ContactEditPageState extends State<ContactEditPage> {
     _notes.text = existing.notes ?? '';
     _giftIdeas.text = existing.giftIdeas ?? '';
     _relationship = existing.relationship;
+    _relationGroup = existing.relationship?.group ?? RelationshipGroup.family;
     _hobbies.addAll(existing.hobbies);
     _tags.addAll(existing.tags);
     _reminder = existing.reminder;
@@ -198,12 +206,38 @@ class _ContactEditPageState extends State<ContactEditPage> {
 
   /// 用「粘贴文本」的方式自动填充表单。
   Future<void> _fillFromText() async {
-    final ParsedContact? parsed = await showContactTextFillDialog(context);
-    if (parsed == null || !mounted) return;
+    final ContactTextFillResult? result = await showContactTextFillDialog(
+      context,
+      defaultCalendar: context
+          .read<SettingsController>()
+          .settings
+          .importCalendar,
+    );
+    if (result == null || !mounted) return;
+
+    // 文本里有好几位 -> 交给「从文本导入」页批量导入，这里就不填了。
+    final String? batchText = result.batchText;
+    if (batchText != null) {
+      final NavigatorState navigator = Navigator.of(context);
+      navigator.pop();
+      await navigator.push(
+        MaterialPageRoute<void>(
+          builder: (BuildContext _) =>
+              ContactImportPage(initialText: batchText),
+        ),
+      );
+      return;
+    }
+
+    final ParsedContact? parsed = result.contact;
+    if (parsed == null) return;
 
     setState(() {
       if (parsed.name.trim().isNotEmpty) _name.text = parsed.name.trim();
-      if (parsed.relationship != null) _relationship = parsed.relationship;
+      if (parsed.relationship != null) {
+        _relationship = parsed.relationship;
+        _relationGroup = parsed.relationship!.group;
+      }
       if (parsed.relationLabel != null) {
         _relationLabel.text = parsed.relationLabel!;
       }
@@ -299,6 +333,8 @@ class _ContactEditPageState extends State<ContactEditPage> {
     if (!mounted) return;
 
     showAppSnackBar(context, _isEditing ? '已保存' : '已添加 ${contact.name}');
+    // 保存后自动回到「联系人」页，方便立刻看到刚保存的人
+    context.read<RootTabController>().goToContacts();
     Navigator.of(context).pop();
   }
 
@@ -352,23 +388,89 @@ class _ContactEditPageState extends State<ContactEditPage> {
                   const SizedBox(height: 14),
                   const _FieldLabel('关系 / 身份（可不填）'),
                   const SizedBox(height: 8),
+                  // 一级：先选分组（家人 / 亲戚 / 朋友 / 同事 / 同学 / 其他）
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: <Widget>[
-                      for (final Relationship item in Relationship.values)
+                      for (final RelationshipGroup group
+                          in RelationshipGroup.values)
                         SelectableChip(
-                          key: Key('relationChip-${item.name}'),
-                          label: item.label,
-                          icon: relationshipIcon(item),
+                          key: Key('relationGroup-${group.name}'),
+                          label: group.label,
+                          icon: relationshipGroupIcon(group),
                           dense: true,
-                          selected: _relationship == item,
+                          selected: _relationGroup == group,
                           onTap: () => setState(() {
-                            _relationship = _relationship == item ? null : item;
+                            _relationGroup = _relationGroup == group
+                                ? null
+                                : group;
                           }),
                         ),
                     ],
                   ),
+                  // 二级：该分组下的具体角色（家人 -> 爸爸 / 妈妈 / 爷爷 …）
+                  if (_relationGroup != null) ...<Widget>[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceAlt,
+                        borderRadius: BorderRadius.circular(
+                          AppSizes.fieldRadius,
+                        ),
+                        border: Border.all(color: AppColors.outline),
+                      ),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          for (final Relationship item
+                              in _relationGroup!.members)
+                            SelectableChip(
+                              key: Key('relationChip-${item.name}'),
+                              label: item.label,
+                              icon: relationshipIcon(item),
+                              dense: true,
+                              selected: _relationship == item,
+                              onTap: () => setState(() {
+                                _relationship = _relationship == item
+                                    ? null
+                                    : item;
+                                _relationGroup = item.group;
+                              }),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (_relationship != null) ...<Widget>[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: <Widget>[
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          size: 15,
+                          color: AppColors.brand,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '已选：${_relationship!.label}',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.brandDark,
+                          ),
+                        ),
+                        TextButton(
+                          key: const Key('clearRelationshipButton'),
+                          onPressed: () => setState(() => _relationship = null),
+                          child: const Text('清除'),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   TextFormField(
                     key: const Key('relationLabelField'),
@@ -417,7 +519,7 @@ class _ContactEditPageState extends State<ContactEditPage> {
                       Expanded(
                         child: SelectableChip(
                           key: const Key('calendarSolar'),
-                          label: '公历',
+                          label: '新历',
                           selected: _calendar == BirthdayCalendar.solar,
                           onTap: () => setState(() {
                             _calendar = BirthdayCalendar.solar;

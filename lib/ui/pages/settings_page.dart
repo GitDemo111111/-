@@ -11,9 +11,10 @@ import '../../theme/app_theme.dart';
 import '../navigation.dart';
 import '../widgets/common.dart';
 import '../widgets/forms.dart';
+import 'tips_page.dart';
 
 /// 应用的版本号（与 pubspec.yaml 保持一致）。
-const String kAppVersion = '1.1.0';
+const String kAppVersion = '1.2.0';
 
 /// 设置页。
 class SettingsPage extends StatelessWidget {
@@ -196,6 +197,36 @@ class SettingsPage extends StatelessWidget {
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
                     ),
+                  ),
+                ),
+                ListTile(
+                  key: const Key('tipsEntry'),
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext _) => const TipsPage(),
+                    ),
+                  ),
+                  leading: const Icon(
+                    Icons.lightbulb_outline_rounded,
+                    color: AppColors.brand,
+                  ),
+                  title: const Text(
+                    '使用提示',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    settings.hiddenTipIds.isEmpty
+                        ? '查看全部使用技巧'
+                        : '已隐藏 ${settings.hiddenTipIds.length} 条',
+                    style: const TextStyle(fontSize: 12.5),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],

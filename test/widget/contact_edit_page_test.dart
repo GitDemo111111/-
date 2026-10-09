@@ -93,6 +93,9 @@ void main() {
     await pumpEditor(tester, harness);
 
     await tester.enterText(find.byKey(const Key('nameField')), '王五');
+    // 先选分组「朋友」，再选具体角色（关系选择器是两级的）
+    await tester.tap(find.byKey(const Key('relationGroup-friend')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('relationChip-friend')));
     await tester.pump();
     await tester.enterText(find.byKey(const Key('relationLabelField')), '大学室友');
@@ -339,7 +342,7 @@ void main() {
 
       await tester.enterText(
         find.byKey(const Key('fillTextField')),
-        '姓名：王五\n关系：朋友\n身份：大学室友\n生日：1996-05-23\n'
+        '姓名：王五\n关系：朋友\n身份：大学室友\n生日：新历1996-05-23\n'
         '爱好：咖啡、徒步\n手机：13800000000\n备注：对花生过敏',
       );
       await tester.pumpAndSettle();
