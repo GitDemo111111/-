@@ -1,5 +1,7 @@
 # 生日管家 (Birthday Keeper)
 
+[![CI](https://github.com/GitDemo111111/-/actions/workflows/ci.yml/badge.svg)](https://github.com/GitDemo111111/-/actions/workflows/ci.yml)
+
 一个干净的 Flutter 手机 App：把重要的人的生日和关键信息记下来，**默认在生日前 3 天和生日当天提醒你**。
 
 - 界面干净简洁，以**高饱和度的浅蓝色**为主色
@@ -8,6 +10,12 @@
 - 配有完整的单元测试 / Widget 测试 / 集成测试，以及 GitHub Actions CI/CD
 
 ![生日管家 · 即将到来](docs/screenshot-home-wide.png)
+
+> **CI 实测结果**：`dart format` 无改动 · `flutter analyze` **0 issue** ·
+> `flutter test` **271 个用例全部通过**（行覆盖率 **94.4%**）·
+> Release **APK / AAB 构建成功** · Web 产物构建成功 ·
+> **Android 模拟器上的集成测试通过**。
+> 运行记录：[Actions](https://github.com/GitDemo111111/-/actions)。
 
 ---
 
