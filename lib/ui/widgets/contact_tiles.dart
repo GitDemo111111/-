@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/astrology.dart';
 import '../../core/birthday_calculator.dart';
 import '../../core/formatters.dart';
 import '../../models/birthday.dart';
@@ -135,7 +136,9 @@ class UpcomingTile extends StatelessWidget {
       formatMonthDay(item.date),
       if (item.contact.relationshipLabel != null)
         item.contact.relationshipLabel!,
-      item.contact.birthday?.isLunar == true ? '农历' : '',
+      if (item.contact.birthday?.isLunar == true) '农历',
+      // 星座由生日自动算出来，不用用户填
+      constellationOf(item.date.month, item.date.day),
     ];
     return parts.where((String e) => e.isNotEmpty).join(' · ');
   }
@@ -149,12 +152,16 @@ class ContactTile extends StatelessWidget {
     required this.onTap,
     this.daysUntil,
     this.turningAge,
+    this.constellation,
   });
 
   final Contact contact;
   final VoidCallback onTap;
   final int? daysUntil;
   final int? turningAge;
+
+  /// 由生日自动推导的星座（农历生日需要先换算成公历，由调用方传入）。
+  final String? constellation;
 
   @override
   Widget build(BuildContext context) {
@@ -243,6 +250,7 @@ class ContactTile extends StatelessWidget {
     final List<String> parts = <String>[
       ?relation,
       ?birthday?.shortLabel,
+      ?constellation,
       if (contact.hobbies.isNotEmpty) contact.hobbies.take(2).join('/'),
     ];
     if (parts.isEmpty) return '还没有填写生日';

@@ -326,4 +326,173 @@ void main() {
 
     expect(harness.contactController.contacts.single.hobbies, contains('攀岩'));
   });
+
+  group('粘贴文本自动填充', () {
+    widgetTest('从文本填充会把各字段带进表单', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      await pumpEditor(tester, harness);
+
+      await tester.tap(find.byKey(const Key('fillFromTextButton')));
+      await tester.pumpAndSettle();
+      expect(find.text('从文本自动填充'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('fillTextField')),
+        '姓名：王五\n关系：朋友\n身份：大学室友\n生日：1996-05-23\n'
+        '爱好：咖啡、徒步\n手机：13800000000\n备注：对花生过敏',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('applyFillButton')));
+      await tester.pumpAndSettle();
+
+      // 表单里已经填好，保存后就是解析出来的内容
+      await tester.tap(find.byKey(const Key('saveButton')));
+      await tester.pumpAndSettle();
+
+      final Contact saved = harness.contactController.contacts.single;
+      expect(saved.name, '王五');
+      expect(saved.relationship, Relationship.friend);
+      expect(saved.relationLabel, '大学室友');
+      expect(saved.birthday, const Birthday(year: 1996, month: 5, day: 23));
+      expect(saved.hobbies, <String>['咖啡', '徒步']);
+      expect(saved.phone, '13800000000');
+      expect(saved.notes, '对花生过敏');
+    });
+
+    widgetTest('农历生日也能通过文本填充设置', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      await pumpEditor(tester, harness);
+
+      await tester.tap(find.byKey(const Key('fillFromTextButton')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('fillTextField')),
+        '姓名：妈妈\n生日：农历八月十五',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('applyFillButton')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('saveButton')));
+      await tester.pumpAndSettle();
+
+      final Birthday birthday =
+          harness.contactController.contacts.single.birthday!;
+      expect(birthday.calendar, BirthdayCalendar.lunar);
+      expect(birthday.month, 8);
+      expect(birthday.day, 15);
+    });
+
+    widgetTest('填充不会覆盖文本里没提到的字段', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness(
+        contacts: <Contact>[
+          makeContact(
+            id: 'a',
+            name: '张三',
+            birthday: const Birthday(month: 3, day: 3),
+            notes: '原来的备注',
+          ),
+        ],
+      );
+      await harness.load();
+      await pumpEditor(tester, harness, contactId: 'a');
+
+      await tester.tap(find.byKey(const Key('fillFromTextButton')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('fillTextField')),
+        '姓名：张三\n手机：13800000000',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('applyFillButton')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('saveButton')));
+      await tester.pumpAndSettle();
+
+      final Contact saved = harness.contactController.contacts.single;
+      expect(saved.phone, '13800000000');
+      // 文本里没写生日和备注，原来的值要保留
+      expect(saved.birthday, const Birthday(month: 3, day: 3));
+      expect(saved.notes, '原来的备注');
+    });
+
+    widgetTest('取消填充不会改动表单', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      await pumpEditor(tester, harness);
+
+      await tester.enterText(find.byKey(const Key('nameField')), '手填的名字');
+      await tester.tap(find.byKey(const Key('fillFromTextButton')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('fillTextField')), '姓名：别人');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('saveButton')));
+      await tester.pumpAndSettle();
+
+      expect(harness.contactController.contacts.single.name, '手填的名字');
+    });
+  });
+
+  group('生日自动识别星座/生肖', () {
+    widgetTest('选了生日就立刻显示星座和生肖', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      await pumpEditor(tester, harness);
+
+      // 还没选生日时不显示「自动识别」
+      expect(find.text('自动识别'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('pickSolarDateButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('确定'));
+      await tester.pumpAndSettle();
+
+      // 1996-01-01 -> 摩羯座
+      expect(find.text('自动识别'), findsOneWidget);
+      expect(find.text('星座'), findsOneWidget);
+      expect(find.text('摩羯座'), findsOneWidget);
+      expect(find.text('属鼠'), findsOneWidget); // 1996 年是鼠年
+      expect(find.text('农历'), findsWidgets);
+    });
+
+    widgetTest('改生日星座会跟着变', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness(
+        contacts: <Contact>[
+          makeContact(
+            id: 'a',
+            name: '张三',
+            birthday: const Birthday(month: 5, day: 20),
+          ),
+        ],
+      );
+      await harness.load();
+      await pumpEditor(tester, harness, contactId: 'a');
+
+      expect(find.text('金牛座'), findsOneWidget);
+    });
+
+    widgetTest('农历生日换算成公历后再算星座', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      await pumpEditor(tester, harness);
+
+      await tester.tap(find.byKey(const Key('calendarLunar')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('lunarMonthDropdown')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('八月').last);
+      await tester.pumpAndSettle();
+
+      // 农历 8 月 1 日 -> 公历 9 月前后 -> 处女座
+      expect(find.text('自动识别'), findsOneWidget);
+      expect(find.text('星座'), findsOneWidget);
+      expect(find.textContaining('农历'), findsWidgets);
+    });
+  });
 }

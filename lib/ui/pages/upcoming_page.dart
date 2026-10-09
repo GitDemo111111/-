@@ -39,15 +39,12 @@ class UpcomingPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
                     if (controller.contacts.isEmpty)
-                      EmptyState(
+                      const EmptyState(
                         icon: Icons.cake_outlined,
                         title: '还没有联系人',
-                        message: '把家人朋友的生日记下来，\n生日前 3 天我会提醒你。',
-                        action: FilledButton.icon(
-                          onPressed: () => openContactEditor(context),
-                          icon: const Icon(Icons.add_rounded),
-                          label: const Text('添加第一位联系人'),
-                        ),
+                        message:
+                            '把家人朋友的生日记下来，\n生日前 3 天我会提醒你。\n\n'
+                            '点右下角「添加」开始，\n或到「联系人」页用文本一次性导入。',
                       )
                     else if (groups.isEmpty)
                       const EmptyState(

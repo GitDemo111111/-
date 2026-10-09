@@ -36,7 +36,7 @@ void main() {
 
     expect(find.text('还没有联系人'), findsOneWidget);
 
-    await tester.tap(find.text('添加第一位联系人'));
+    await tester.tap(find.text('添加').first); // 右下角 FAB
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const Key('nameField')), '集成测试联系人');

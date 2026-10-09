@@ -78,7 +78,7 @@ void main() {
     await pumpApp(tester, harness);
 
     // 1. 从空状态进入新建页面
-    await tester.tap(find.text('添加第一位联系人'));
+    await tester.tap(find.text('添加').first); // 右下角 FAB
     await tester.pumpAndSettle();
     expect(find.byType(ContactEditPage), findsOneWidget);
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/contact_text_parser.dart';
 import '../../core/lunar_names.dart';
 import '../../models/birthday.dart';
 import '../../models/contact.dart';
@@ -10,6 +11,8 @@ import '../../state/contact_controller.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/visuals.dart';
 import '../navigation.dart';
+import '../widgets/birthday_facts.dart';
+import '../widgets/contact_text_help.dart';
 import '../widgets/forms.dart';
 
 /// 新建 / 编辑联系人。
@@ -193,6 +196,58 @@ class _ContactEditPageState extends State<ContactEditPage> {
     });
   }
 
+  /// 用「粘贴文本」的方式自动填充表单。
+  Future<void> _fillFromText() async {
+    final ParsedContact? parsed = await showContactTextFillDialog(context);
+    if (parsed == null || !mounted) return;
+
+    setState(() {
+      if (parsed.name.trim().isNotEmpty) _name.text = parsed.name.trim();
+      if (parsed.relationship != null) _relationship = parsed.relationship;
+      if (parsed.relationLabel != null) {
+        _relationLabel.text = parsed.relationLabel!;
+      }
+      if (parsed.hobbies.isNotEmpty) {
+        _hobbies
+          ..clear()
+          ..addAll(parsed.hobbies);
+      }
+      if (parsed.tags.isNotEmpty) {
+        _tags
+          ..clear()
+          ..addAll(parsed.tags);
+      }
+      if (parsed.phone != null) _phone.text = parsed.phone!;
+      if (parsed.email != null) _email.text = parsed.email!;
+      if (parsed.wechat != null) _wechat.text = parsed.wechat!;
+      if (parsed.notes != null) _notes.text = parsed.notes!;
+      if (parsed.giftIdeas != null) _giftIdeas.text = parsed.giftIdeas!;
+      if (parsed.avatarEmoji != null) _avatarEmoji = parsed.avatarEmoji;
+
+      final Birthday? birthday = parsed.birthday;
+      if (birthday != null) {
+        _calendar = birthday.calendar;
+        _yearUnknown = !birthday.hasYear;
+        _birthdayError = null;
+        if (birthday.isSolar) {
+          _solarDate = DateTime(
+            birthday.year ?? kReferenceLeapYear,
+            birthday.month,
+            birthday.day,
+          );
+        } else {
+          _lunarMonth = birthday.month;
+          _lunarDay = birthday.day;
+          _lunarLeap = birthday.isLeapMonth;
+          _lunarYear = birthday.year ?? 1995;
+          _lunarSet = true;
+        }
+      }
+    });
+    if (!mounted) return;
+    showAppSnackBar(context, '已按文本填充，请核对后保存');
+  }
+
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -253,6 +308,12 @@ class _ContactEditPageState extends State<ContactEditPage> {
       appBar: AppBar(
         title: Text(_isEditing ? '编辑联系人' : '新建联系人'),
         actions: <Widget>[
+          IconButton(
+            key: const Key('fillFromTextButton'),
+            tooltip: '粘贴文本自动填充',
+            onPressed: _saving ? null : _fillFromText,
+            icon: const Icon(Icons.content_paste_go_rounded),
+          ),
           TextButton(
             key: const Key('saveButton'),
             onPressed: _saving ? null : _save,
@@ -454,6 +515,21 @@ class _ContactEditPageState extends State<ContactEditPage> {
                         ),
                       ),
                     ),
+                  // 星座 / 生肖 / 农历都由生日自动算出来，用户不用填。
+                  if (_liveFactsBirthday != null) ...<Widget>[
+                    const SizedBox(height: 12),
+                    const _FieldLabel('自动识别'),
+                    const SizedBox(height: 8),
+                    Builder(
+                      builder: (BuildContext context) => BirthdayFacts(
+                        birthday: _liveFactsBirthday!,
+                        calculator: context
+                            .read<ContactController>()
+                            .calculator,
+                        now: context.read<ContactController>().now,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -673,6 +749,13 @@ class _ContactEditPageState extends State<ContactEditPage> {
         ),
       ),
     );
+  }
+
+  /// 当前表单里「合法且已设置」的生日，用于实时展示星座/生肖/农历。
+  Birthday? get _liveFactsBirthday {
+    final Birthday? birthday = _buildBirthday();
+    if (birthday == null) return null;
+    return birthday.validate() == null ? birthday : null;
   }
 
   /// 是否已经选过生日（决定是否显示「不知道年份」等附加选项）。

@@ -19,7 +19,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('还没有联系人'), findsOneWidget);
-    expect(find.text('添加第一位联系人'), findsOneWidget);
+    // 空状态里不再放按钮（避免和右下角 FAB 重复），只保留引导文案\n    expect(find.textContaining('点右下角'), findsOneWidget);\n    expect(find.text('添加'), findsOneWidget); // 只有 FAB 这一处
     expect(find.text('生日管家'), findsOneWidget);
     // 概览数字都是 0
     expect(find.text('今天生日'), findsOneWidget);

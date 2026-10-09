@@ -21,7 +21,7 @@ void main() {
     await pumpContacts(tester, harness);
 
     expect(find.text('还没有联系人'), findsOneWidget);
-    expect(find.text('添加联系人'), findsOneWidget);
+    // 空状态里不再放按钮，新增入口只有右下角 FAB\n    expect(find.text('添加'), findsOneWidget);
   });
 
   widgetTest('列出全部联系人并显示生日与年龄', (WidgetTester tester) async {

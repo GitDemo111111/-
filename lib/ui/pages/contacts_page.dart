@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/astrology.dart';
 import '../../core/birthday_calculator.dart';
 import '../../models/contact.dart';
 import '../../models/relationship.dart';
@@ -10,6 +11,7 @@ import '../navigation.dart';
 import '../widgets/common.dart';
 import '../widgets/contact_tiles.dart';
 import '../widgets/forms.dart';
+import 'contact_import_page.dart';
 
 /// 「联系人」页：搜索 + 关系/爱好筛选 + 完整列表。
 class ContactsPage extends StatelessWidget {
@@ -56,7 +58,18 @@ class ContactsPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    key: const Key('importFromTextButton'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (BuildContext _) => const ContactImportPage(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.content_paste_go_rounded),
+                    tooltip: '从文本导入',
+                  ),
+                  const SizedBox(width: 8),
                   _FilterButton(controller: controller),
                 ],
               ),
@@ -95,18 +108,14 @@ class ContactsPage extends StatelessWidget {
                           ? '还没有联系人'
                           : '没有符合条件的联系人',
                       message: controller.contacts.isEmpty
-                          ? '点击右下角添加第一位联系人。'
+                          ? '点右下角「添加」新建一位，\n或点搜索框旁的粘贴图标批量导入。'
                           : '试试换个关键词或清除筛选条件。',
                       action: controller.hasActiveFilters
                           ? OutlinedButton(
                               onPressed: controller.clearFilters,
                               child: const Text('清除筛选'),
                             )
-                          : FilledButton.icon(
-                              onPressed: () => openContactEditor(context),
-                              icon: const Icon(Icons.add_rounded),
-                              label: const Text('添加联系人'),
-                            ),
+                          : null,
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
@@ -120,6 +129,13 @@ class ContactsPage extends StatelessWidget {
                           contact: contact,
                           daysUntil: item?.daysUntil,
                           turningAge: item?.turningAge,
+                          // 星座由生日自动推导（农历会先换算成公历）
+                          constellation: item == null
+                              ? null
+                              : constellationOf(
+                                  item.occurrence.date.month,
+                                  item.occurrence.date.day,
+                                ),
                           onTap: () => openContactDetail(context, contact.id),
                         );
                       },
