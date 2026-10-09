@@ -13,7 +13,7 @@ import '../widgets/common.dart';
 import '../widgets/forms.dart';
 
 /// 应用的版本号（与 pubspec.yaml 保持一致）。
-const String kAppVersion = '1.0.0';
+const String kAppVersion = '1.1.0';
 
 /// 设置页。
 class SettingsPage extends StatelessWidget {
