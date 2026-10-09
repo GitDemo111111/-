@@ -49,7 +49,15 @@ $shareDir = Join-Path $env:TEMP 'birthday_keeper_share'
 if (Test-Path $shareDir) { Remove-Item $shareDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $shareDir | Out-Null
 
-$fileName = 'birthday-keeper-1.0.0.apk'
+# 用 APK 自己的文件名（保证页面上写的版本和真正装上去的一致）。
+# 之前这里写死成 1.0.0，导致换了包之后页面还显示旧版本号。
+$fileName = $apk.Name
+# 版本号从文件名里取：birthday-keeper-1.2.0[-arm64-v8a].apk -> 1.2.0
+$versionMatch = [regex]::Match($fileName, '^birthday-keeper-([0-9]+(?:\.[0-9]+)*)')
+$version = if ($versionMatch.Success) { $versionMatch.Groups[1].Value } else { '未知' }
+# 架构后缀（分架构包才有）
+$abiMatch = [regex]::Match($fileName, '(arm64-v8a|armeabi-v7a|x86_64)')
+$abi = if ($abiMatch.Success) { $abiMatch.Groups[1].Value } else { '通用（含全部架构）' }
 Copy-Item $apk.FullName (Join-Path $shareDir $fileName) -Force
 
 # 找一块真实的局域网网卡地址（排除回环 / VMware 虚拟网卡）
@@ -104,7 +112,9 @@ $html = @"
     <div class="sub">记录亲友生日，生日前 3 天和当天提醒你</div>
     <a class="dl" href="$fileName" download>下载 APK 并安装</a>
     <div class="meta">
-      版本：<code>1.0.0</code><br>
+      版本：<code>$version</code><br>
+      架构：<code>$abi</code><br>
+      文件：<code>$fileName</code><br>
       大小：<code>$sizeMb MB</code><br>
       构建时间：<code>$built</code><br>
       SHA256：<code>$sha256</code>

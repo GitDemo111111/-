@@ -136,8 +136,7 @@ class ContactTextParser {
     final List<List<String>> blocks = _splitBlocks(text);
     final List<ParsedContact> result = <ParsedContact>[];
     for (final List<String> block in blocks) {
-      final ParsedContact? parsed = _parseBlock(block);
-      if (parsed != null) result.add(parsed);
+      result.addAll(_parseBlockEntries(block));
     }
     return result;
   }
@@ -215,6 +214,33 @@ class ContactTextParser {
 
   // ------------------------------------------------------------ 解析单块
 
+  /// 解析一个块，可能得到**多条**（例如微信里很常见的「一行一位」名单）。
+  List<ParsedContact> _parseBlockEntries(List<String> lines) {
+    if (lines.isEmpty) return const <ParsedContact>[];
+    if (!_hasStructuredField(lines)) return _parseLooseEntries(lines);
+    final ParsedContact? one = _parseBlock(lines);
+    return one == null ? const <ParsedContact>[] : <ParsedContact>[one];
+  }
+
+  /// 判断这一段是不是「带字段名的格式」。
+  ///
+  /// 只看「前缀匹配」不算数（例如「喜欢喝咖啡」会被前缀匹配成爱好字段），
+  /// 否则一段没有字段名的自由文字会被误判成结构化输入。
+  bool _hasStructuredField(List<String> lines) {
+    for (final String line in lines) {
+      final (String label, String value) = _splitLabel(line);
+      if (label.isEmpty) continue;
+      final String? field = _fieldOf(label);
+      if (field == null) continue;
+      if (field == 'name' && value.trim().isNotEmpty) return true;
+      if (_hasSeparator(line)) return true;
+      // 前缀匹配只对「强字段」算数：手机号/生日/微信 这种；
+      // 爱好、备注这类标签经常就是普通句子的开头（喜欢…、备注…），不算。
+      if (!_weakPrefixFields.contains(field)) return true;
+    }
+    return false;
+  }
+
   ParsedContact? _parseBlock(List<String> lines) {
     if (lines.isEmpty) return null;
 
@@ -232,38 +258,6 @@ class ContactTextParser {
     String? avatarEmoji;
     final List<String> noteParts = <String>[];
     final List<String> warnings = <String>[];
-
-    // 判断这一段是不是「带字段名的格式」：
-    // - 出现了明确的「姓名：xxx」，或
-    // - 出现了带分隔符（冒号 / 等号）的已知字段。
-    //
-    // 只看「前缀匹配」不算（例如「喜欢喝咖啡」会被前缀匹配成爱好字段），
-    // 否则一段没有字段名的自由文字会被误判成结构化输入。
-    bool hasStructuredField = false;
-    for (final String line in lines) {
-      final (String label, String value) = _splitLabel(line);
-      if (label.isEmpty) continue;
-      final String? field = _fieldOf(label);
-      if (field == null) continue;
-      if (field == 'name' && value.trim().isNotEmpty) {
-        hasStructuredField = true;
-        break;
-      }
-      if (_hasSeparator(line)) {
-        hasStructuredField = true;
-        break;
-      }
-      // 前缀匹配只对「强字段」算数：手机号/生日/微信 这种；
-      // 爱好、备注这类标签经常就是普通句子的开头（喜欢…、备注…），不算。
-      if (!_weakPrefixFields.contains(field)) {
-        hasStructuredField = true;
-        break;
-      }
-    }
-
-    if (!hasStructuredField) {
-      return _parseLooseBlock(lines);
-    }
 
     // 先扫一遍「历法」，这样它写在「生日」后面也能生效；
     // 同时不会覆盖生日行里自己写的「公历/农历」。
@@ -418,6 +412,154 @@ class ContactTextParser {
       notes: remaining.isEmpty ? null : remaining.join('\n'),
       warnings: warnings,
     );
+  }
+
+  // ------------------------------------------------- 宽松模式：可能是名单
+
+  static final RegExp _phonePattern = RegExp(r'(?<!\d)(\d{7,15})(?!\d)');
+
+  /// 宽松模式：整段没有字段名。
+  ///
+  /// 关键分支：如果里面有**多行各自带日期**，那多半是微信里常见的名单
+  /// （`张三 5月20日` / `张三,5月20日` / `张三：5月20日` / 姓名一行日期一行），
+  /// 这时按「一行一位」拆开，而不是把 11 个人当成 1 个人。
+  List<ParsedContact> _parseLooseEntries(List<String> lines) {
+    final List<String> items = lines
+        .map((String l) => l.trim())
+        .where((String l) => l.isNotEmpty)
+        .toList();
+    bool hasDateAt(int i) => i < items.length && _dateMatch(items[i]) != null;
+
+    final List<List<String>> groups = <List<String>>[];
+    List<String> current = <String>[];
+    bool currentHasDate = false;
+    for (int i = 0; i < items.length; i++) {
+      final String line = items[i];
+      final bool hasDate = hasDateAt(i);
+      // 开新一组的两种情况：
+      // 1) 这一行是日期，而当前组已经有日期了；
+      // 2) 这一行不是日期，但当前组已经有日期，而且**下一行是日期**
+      //    —— 说明这是下一位的名字（「姓名一行、日期一行」的写法）。
+      final bool startsNew = currentHasDate && (hasDate || hasDateAt(i + 1));
+      if (startsNew) {
+        groups.add(current);
+        current = <String>[];
+        currentHasDate = false;
+      }
+      current.add(line);
+      currentHasDate = currentHasDate || hasDate;
+    }
+    if (current.isNotEmpty) groups.add(current);
+
+    // 只有一段、且不带日期规律 -> 保持原来的「整段一个人」行为
+    final int datedGroups = groups
+        .where((List<String> g) => g.any((String l) => _dateMatch(l) != null))
+        .length;
+    if (datedGroups < 2) {
+      final ParsedContact? single = _parseLooseBlock(lines);
+      return single == null ? const <ParsedContact>[] : <ParsedContact>[single];
+    }
+
+    final List<ParsedContact> result = <ParsedContact>[];
+    for (final List<String> group in groups) {
+      result.add(_parseLooseGroup(group));
+    }
+    return result;
+  }
+
+  /// 把「一位联系人」的那一小段文本解析出来。
+  ParsedContact _parseLooseGroup(List<String> group) {
+    String? name;
+    Birthday? birthday;
+    String? phone;
+    final List<String> notes = <String>[];
+    final List<String> warnings = <String>[];
+
+    for (final String line in group) {
+      final Match? dateMatch = _dateMatch(line);
+      if (dateMatch != null && birthday == null) {
+        final Birthday? parsed = _parseBirthday(line, defaultCalendar);
+        if (parsed != null && parsed.validate() == null) {
+          birthday = parsed;
+          final String before = line
+              .substring(0, dateMatch.start)
+              .replaceAll(RegExp(r'[\s:：,，、;；\-—|]+$'), '')
+              .replaceAll(RegExp(r'^[\s:：,，、;；\-—|]+'), '')
+              .trim();
+          final String after = line
+              .substring(dateMatch.end)
+              .replaceAll(RegExp(r'^[\s:：,，、;；\-—|]+'), '')
+              .trim();
+          if (before.isNotEmpty) name = before;
+          _absorbRest(after, onPhone: (String p) => phone = p, notes: notes);
+          continue;
+        }
+      }
+      // 不是日期：先当姓名，已经有了就当补充信息
+      if (name == null) {
+        name = line;
+        continue;
+      }
+      _absorbRest(line, onPhone: (String p) => phone = p, notes: notes);
+    }
+
+    if (name == null) warnings.add('缺少「姓名」，这一条无法导入');
+    if (birthday == null && name != null) {
+      // 分组里理论上一定有日期，这里只是兜底
+      warnings.add('没看懂生日，请手动选择');
+    }
+    return ParsedContact(
+      name: name ?? '',
+      birthday: birthday,
+      phone: phone,
+      notes: notes.isEmpty ? null : notes.join('\n'),
+      warnings: warnings,
+    );
+  }
+
+  /// 把日期后面/前面剩下的文本归位：像手机号的当手机号，其余进备注。
+  static void _absorbRest(
+    String text, {
+    required void Function(String) onPhone,
+    required List<String> notes,
+  }) {
+    String rest = text.trim();
+    if (rest.isEmpty) return;
+    final Match? phone = _phonePattern.firstMatch(rest);
+    if (phone != null) {
+      onPhone(phone.group(1)!);
+      rest = (rest.substring(0, phone.start) + rest.substring(phone.end))
+          .replaceAll(RegExp(r'[\s:：,，、;；\-—|]+'), ' ')
+          .trim();
+    }
+    if (rest.isNotEmpty) notes.add(rest);
+  }
+
+  /// 这一行里第一个日期片段的位置（顺序和 [_parseBirthday] 一致）。
+  static Match? _dateMatch(String text) {
+    for (final RegExp pattern in <RegExp>[
+      _yearMonthDay,
+      _monthDay,
+      _chineseDate,
+    ]) {
+      final Match? match = pattern.firstMatch(text);
+      if (match != null) return match;
+    }
+    // 纯数字 0520 / 520
+    final Match? digits = RegExp(
+      r'(?<![\d])(\d{3,4})(?![\d])',
+    ).firstMatch(text);
+    if (digits != null) {
+      final String value = digits.group(1)!;
+      final int month = value.length == 4
+          ? int.parse(value.substring(0, 2))
+          : int.parse(value.substring(0, 1));
+      final int day = value.length == 4
+          ? int.parse(value.substring(2))
+          : int.parse(value.substring(1));
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return digits;
+    }
+    return null;
   }
 
   static void _applyRelationship(
