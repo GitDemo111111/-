@@ -1,0 +1,14 @@
+/.gradle
+/captures/
+/local.properties
+GeneratedPluginRegistrant.java
+.cxx/
+
+# 注意：Gradle Wrapper（gradlew / gradlew.bat / gradle-wrapper.jar）**要提交**，
+# 这样 CI 上的全新 clone 不需要额外安装 Gradle 就能直接构建。
+
+# Remember to never publicly share your keystore.
+# See https://flutter.dev/to/reference-keystore
+key.properties
+**/*.keystore
+**/*.jks

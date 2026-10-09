@@ -1,0 +1,17 @@
+# 静态分析配置。
+#
+# 在 flutter_lints 推荐规则的基础上，只做一处有明确理由的取舍。
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+
+linter:
+  rules:
+    # 「用初始化形参代替构造函数体内的赋值」这条规则在
+    # 「私有字段 + 命名参数」的场景下是误报：它建议的 this._store 会让
+    # 命名参数本身变成私有的，于是 tests/ 等其它 library 无法再传这个参数。
+    # 因为本项目大量使用这种注入写法，这里显式关闭。
+    prefer_initializing_formals: false

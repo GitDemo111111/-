@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+# 固定 Flutter 版本，保证本地与 CI 结果一致。
+env:
+  FLUTTER_VERSION: '3.44.3'
+  JAVA_VERSION: '17'
+
+jobs:
+  quality:
+    name: 静态分析 / 单元测试 / Widget 测试
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 拉取依赖
+        run: flutter pub get
+
+      - name: 检查代码格式
+        run: dart format --output=none --set-exit-if-changed lib test integration_test
+
+      - name: 静态分析
+        run: flutter analyze --fatal-infos
+
+      - name: 运行测试并生成覆盖率
+        run: flutter test --coverage --reporter expanded
+
+      - name: 上传覆盖率报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: ignore
+
+  android:
+    name: 构建 Android 产物
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 拉取依赖
+        run: flutter pub get
+
+      - name: 构建 Release APK
+        run: flutter build apk --release
+
+      - name: 构建 Release AAB（用于上架）
+        run: flutter build appbundle --release
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: birthday-keeper-android
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+  web:
+    name: 构建 Web 预览版
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 拉取依赖
+        run: flutter pub get
+
+      - name: 构建 Web 产物
+        run: flutter build web --release
+
+      - name: 上传 Web 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: birthday-keeper-web
+          path: build/web
+          if-no-files-found: error
+
+  integration:
+    name: 模拟器集成测试
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 拉取依赖
+        run: flutter pub get
+
+      - name: 打开 KVM 加速
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: 在 Android 模拟器上运行集成测试
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: flutter test integration_test/app_test.dart -d emulator-5554
