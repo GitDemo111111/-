@@ -202,10 +202,7 @@ void main() {
 
       expect(find.text('已有同名，将新增'), findsOneWidget);
 
-      await tester.ensureVisible(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
+      await tapImportButton(tester);
 
       expect(harness.contactController.contacts, hasLength(2));
     });
@@ -222,10 +219,7 @@ void main() {
       expect(find.text('重复，自动合并'), findsOneWidget);
       expect(find.text('2 位可导入，1 位重复将合并'), findsOneWidget);
 
-      await tester.ensureVisible(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
+      await tapImportButton(tester);
 
       expect(harness.contactController.contacts, hasLength(2));
       expect(
@@ -236,41 +230,41 @@ void main() {
   });
 
   group('默认历法开关', () {
-    widgetTest('默认新历：没写历法按新历解析', (WidgetTester tester) async {
+    widgetTest('默认农历：没写历法按农历解析', (WidgetTester tester) async {
       final TestHarness harness = TestHarness();
       await harness.load();
       await pumpImport(tester, harness);
 
-      // 设置里的默认值是新历（用户真实数据里农历都会显式标注）
+      // 用户要求：导入的日期都默认农历（新历自己手动改）
+      expect(
+        harness.settingsController.settings.importCalendar,
+        BirthdayCalendar.lunar,
+      );
+
+      await paste(tester, '姓名：张三\n生日：5月20日');
+      expect(find.text('农历5月20日'), findsWidgets);
+    });
+
+    widgetTest('切到新历后立即重新解析并记住设置', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      await pumpImport(tester, harness);
+
+      await paste(tester, '姓名：张三\n生日：5月20日');
+      expect(find.text('农历5月20日'), findsWidgets);
+
+      await tester.tap(find.byKey(const Key('importCalendar-solar')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('农历5月20日'), findsNothing);
       expect(
         harness.settingsController.settings.importCalendar,
         BirthdayCalendar.solar,
       );
-
-      await paste(tester, '姓名：张三\n生日：5月20日');
-      expect(find.text('5月20日'), findsWidgets);
-    });
-
-    widgetTest('切到农历后立即重新解析并记住设置', (WidgetTester tester) async {
-      final TestHarness harness = TestHarness();
-      await harness.load();
-      await pumpImport(tester, harness);
-
-      await paste(tester, '姓名：张三\n生日：5月20日');
-      expect(find.text('农历5月20日'), findsNothing);
-
-      await tester.tap(find.byKey(const Key('importCalendar-lunar')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('农历5月20日'), findsWidgets);
-      expect(
-        harness.settingsController.settings.importCalendar,
-        BirthdayCalendar.lunar,
-      );
       // 设置写回了仓库
       expect(
         (await harness.settingsRepository.load()).importCalendar,
-        BirthdayCalendar.lunar,
+        BirthdayCalendar.solar,
       );
     });
 

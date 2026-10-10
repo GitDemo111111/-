@@ -175,3 +175,24 @@ class TestHarness {
     );
   }
 }
+
+/// 滚到「导入 N 位联系人」按钮并点它。
+///
+/// 粘贴很多人时卡片很长，按钮在屏幕外、ListView 还没构建它，
+/// 直接 ensureVisible / tap 会报 "Bad state: No element"。
+Future<void> tapImportButton(WidgetTester tester) async {
+  final Finder button = find.byKey(const Key('doImportButton'));
+  await tester.scrollUntilVisible(
+    button,
+    400,
+    scrollable: find
+        .descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(button);
+  await tester.pumpAndSettle();
+}

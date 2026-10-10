@@ -54,6 +54,7 @@ class ParsedContact {
     this.giftIdeas,
     this.avatarEmoji,
     this.warnings = const <String>[],
+    this.birthdayCalendarFromText = false,
   });
 
   final String name;
@@ -71,6 +72,34 @@ class ParsedContact {
 
   /// 解析过程中的提醒（认不出的字段、看不懂的日期等）。
   final List<String> warnings;
+
+  /// 生日那一行里**是否明确写了**「新历 / 农历」。
+  ///
+  /// 写了就以此为准；没写就按导入页选的默认历法（默认农历），
+  /// 并允许在预览里逐条切换 —— 用户要求：默认农历，新历自己手动改。
+  final bool birthdayCalendarFromText;
+
+  /// 换一种历法理解这个生日（月 / 日不变，只改解释方式）。
+  ParsedContact withCalendar(BirthdayCalendar calendar) {
+    final Birthday? current = birthday;
+    if (current == null || current.calendar == calendar) return this;
+    return ParsedContact(
+      name: name,
+      relationship: relationship,
+      relationLabel: relationLabel,
+      birthday: current.copyWith(calendar: calendar),
+      hobbies: hobbies,
+      tags: tags,
+      phone: phone,
+      email: email,
+      wechat: wechat,
+      notes: notes,
+      giftIdeas: giftIdeas,
+      avatarEmoji: avatarEmoji,
+      warnings: warnings,
+      birthdayCalendarFromText: birthdayCalendarFromText,
+    );
+  }
 
   /// 姓名是唯一必填项。
   bool get isValid => name.trim().isNotEmpty;
@@ -123,27 +152,24 @@ class ParsedContact {
 /// 目标是让人把微信里收到的信息直接粘进来就能用，所以尽量容错：
 /// 标签有别名、冒号全角半角都行、日期多种写法、多个人用空行或 `---` 隔开。
 class ContactTextParser {
-  const ContactTextParser({this.defaultCalendar = BirthdayCalendar.solar});
+  const ContactTextParser({this.defaultCalendar = BirthdayCalendar.lunar});
 
   /// 文本里没写明历法时，按哪种历法理解。
   ///
-  /// 默认**农历**（记长辈生日更常用）；写了「新历 / 公历 / 阳历」或「农历」
-  /// 的行会覆盖这个默认值。
+  /// 默认**农历**（用户要求：家里长辈的生日基本都按农历记）；
+  /// 写了「新历 / 公历 / 阳历」的行会覆盖这个默认值，
+  /// 界面上还允许**逐条**切换（导入预览里每条都有 新历/农历 按钮）。
   final BirthdayCalendar defaultCalendar;
 
   /// 解析文本，返回所有解析出来的条目（含缺姓名的无效条目）。
   List<ParsedContact> parse(String text) {
     final List<List<String>> blocks = _splitBlocks(text);
-    // 文档级推断：这段文本里出现过「农历」字样，说明作者会显式标注农历，
-    // 那么**没标注**的日期就按新历理解（否则 1972-09-18 这种 ISO 写法会被误当农历）。
-    final bool marksLunar = RegExp(r'农历|阴历|旧历|農曆').hasMatch(text);
-    final BirthdayCalendar fallback = marksLunar
-        ? BirthdayCalendar.solar
-        : defaultCalendar;
-
+    // 没有任何「文档级推断」：没写历法的一律按 defaultCalendar（默认农历）。
+    // 用户原话：我导入的日期都要默认农历，新历我自己会手动更改。
+    // 界面上允许逐条切换，但不替用户猜。
     final List<ParsedContact> result = <ParsedContact>[];
     for (final List<String> block in blocks) {
-      result.addAll(_parseBlockEntries(block, fallback));
+      result.addAll(_parseBlockEntries(block, defaultCalendar));
     }
     return result;
   }
@@ -268,6 +294,7 @@ class ContactTextParser {
     String? avatarEmoji;
     final List<String> noteParts = <String>[];
     final List<String> warnings = <String>[];
+    bool birthdayFromText = false;
 
     // 先扫一遍「历法」，这样它写在「生日」后面也能生效；
     // 同时不会覆盖生日行里自己写的「公历/农历」。
@@ -333,6 +360,7 @@ class ContactTextParser {
             warnings.add('生日「$trimmed」不是有效日期（${parsed.validate()}）');
           } else {
             birthday = parsed;
+            birthdayFromText = _parseCalendar(trimmed) != null;
           }
         case 'hobbies':
           hobbies.addAll(_splitList(trimmed));
@@ -374,6 +402,7 @@ class ContactTextParser {
       giftIdeas: giftIdeas,
       avatarEmoji: avatarEmoji,
       warnings: warnings,
+      birthdayCalendarFromText: birthdayFromText,
     );
   }
 
@@ -385,6 +414,7 @@ class ContactTextParser {
     final List<String> remaining = <String>[];
     String? name;
     Birthday? birthday;
+    bool birthdayFromText = false;
     final List<String> warnings = <String>[];
 
     for (final String line in lines) {
@@ -407,6 +437,7 @@ class ContactTextParser {
         final Birthday? parsed = _parseBirthday(line, fallback);
         if (parsed != null && parsed.validate() == null) {
           birthday = parsed;
+          birthdayFromText = _parseCalendar(line) != null;
           continue;
         }
       }
@@ -424,6 +455,7 @@ class ContactTextParser {
       birthday: birthday,
       notes: remaining.isEmpty ? null : remaining.join('\n'),
       warnings: warnings,
+      birthdayCalendarFromText: birthdayFromText,
     );
   }
 
@@ -491,6 +523,7 @@ class ContactTextParser {
     String? name;
     Birthday? birthday;
     String? phone;
+    bool birthdayFromText = false;
     final List<String> notes = <String>[];
     final List<String> warnings = <String>[];
 
@@ -500,6 +533,7 @@ class ContactTextParser {
         final Birthday? parsed = _parseBirthday(line, fallback);
         if (parsed != null && parsed.validate() == null) {
           birthday = parsed;
+          birthdayFromText = _parseCalendar(line) != null;
           final String before = line
               .substring(0, dateMatch.start)
               .replaceAll(RegExp(r'[\s:：,，、;；\-—|]+$'), '')
@@ -533,6 +567,7 @@ class ContactTextParser {
       phone: phone,
       notes: notes.isEmpty ? null : notes.join('\n'),
       warnings: warnings,
+      birthdayCalendarFromText: birthdayFromText,
     );
   }
 

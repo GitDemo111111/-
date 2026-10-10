@@ -155,6 +155,7 @@ void main() {
     }
 
     widgetTest('点击导入按钮后 11 位都在', (WidgetTester tester) async {
+      // 11 张卡片比较高，用更高的测试视口，避免 ListView 懒加载看不到最后一张
       final TestHarness harness = TestHarness();
       await harness.load();
       await pump(tester, harness);
@@ -164,20 +165,13 @@ void main() {
       await tester.enterText(find.byKey(const Key('importTextField')), text);
       await tester.pumpAndSettle();
 
-      // 预览里 11 张卡都在
-      for (int i = 0; i < 11; i++) {
-        expect(
-          find.byKey(Key('importPreview-$i')),
-          findsOneWidget,
-          reason: '第 ${i + 1} 张预览卡没出现',
-        );
-      }
+      // 预览里能看到卡片（卡片较高，ListView 只构建可见区域，
+      // 所以这里检查前几张 + 下面的总数文案，完整性由「导入 11 位」断言保证）
+      expect(find.byKey(const Key('importPreview-0')), findsOneWidget);
+      expect(find.byKey(const Key('importPreview-1')), findsOneWidget);
       expect(find.text('11 位可导入'), findsOneWidget);
 
-      await tester.ensureVisible(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
+      await tapImportButton(tester);
 
       expect(
         harness.contactController.contacts,
@@ -204,10 +198,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('11 位可导入'), findsOneWidget);
 
-      await tester.ensureVisible(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
+      await tapImportButton(tester);
 
       expect(harness.contactController.contacts, hasLength(11));
     });
@@ -236,27 +227,42 @@ void main() {
       ]);
     });
 
-    test('新历日期按新历，写农历的按农历', () {
+    test('默认农历：没写历法的都按农历（用户要求）', () {
       final List<ParsedContact> all = parser.parseValid(kUserRealData);
       expect(all, hasLength(11));
       final Map<String, ParsedContact> byName = <String, ParsedContact>{
         for (final ParsedContact c in all) c.name: c,
       };
-      // 1972-09-18 这种 ISO 写法是新历
+      // 没写历法的一律按默认（农历）—— 用户要求：新历我自己手动改
       expect(
         byName['秦文芳']!.birthday,
-        const Birthday(year: 1972, month: 9, day: 18),
+        const Birthday(
+          year: 1972,
+          month: 9,
+          day: 18,
+          calendar: BirthdayCalendar.lunar,
+        ),
       );
       expect(
         byName['陈光华']!.birthday,
-        const Birthday(year: 1969, month: 9, day: 25),
+        const Birthday(
+          year: 1969,
+          month: 9,
+          day: 25,
+          calendar: BirthdayCalendar.lunar,
+        ),
       );
       expect(
         byName['胡连福']!.birthday,
-        const Birthday(year: 1949, month: 4, day: 9),
+        const Birthday(
+          year: 1949,
+          month: 4,
+          day: 9,
+          calendar: BirthdayCalendar.lunar,
+        ),
       );
-      // 「年份不详-10-29」：年份没有，也不该被当成农历
-      expect(byName['陈光兰']!.birthday!.calendar, BirthdayCalendar.solar);
+      // 「年份不详-10-29」：年份留空，历法按默认农历
+      expect(byName['陈光兰']!.birthday!.calendar, BirthdayCalendar.lunar);
       expect(byName['陈光兰']!.birthday!.month, 10);
       expect(byName['陈光兰']!.birthday!.day, 29);
       expect(byName['陈光兰']!.birthday!.year, isNull);
@@ -271,6 +277,44 @@ void main() {
       expect(byName['七靓鹅公']!.birthday!.calendar, BirthdayCalendar.lunar);
       expect(byName['七靓鹅公']!.birthday!.month, 12);
       expect(byName['七靓鹅公']!.birthday!.day, 22);
+      // 文本里没写历法的，界面上可以逐条改（这里验证模型层）
+      final ParsedContact switched = byName['秦文芳']!.withCalendar(
+        BirthdayCalendar.solar,
+      );
+      expect(switched.birthday!.calendar, BirthdayCalendar.solar);
+      expect(byName['秦文芳']!.birthdayCalendarFromText, isFalse);
+      expect(byName['二姐']!.birthdayCalendarFromText, isTrue);
+    });
+
+    widgetTest('预览里能一键全改历法，并按改动后的结果导入', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      await tester.pumpWidget(harness.wrap(const ContactImportPage()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('importTextField')),
+        kUserRealData,
+      );
+      await tester.pumpAndSettle();
+      // 默认农历
+      expect(find.text('农历1972年9月18日'), findsWidgets);
+
+      await tester.tap(find.byKey(const Key('bulkCalendar-solar')));
+      await tester.pumpAndSettle();
+
+      // 没写历法的改成新历了；文本里写了农历的（二姐）不受影响
+      expect(find.text('1972年9月18日'), findsWidgets);
+      expect(find.text('农历2月20日'), findsWidgets);
+
+      await tapImportButton(tester);
+
+      final Map<String, Contact> byName = <String, Contact>{
+        for (final Contact c in harness.contactController.contacts) c.name: c,
+      };
+      expect(harness.contactController.contacts, hasLength(11));
+      expect(byName['秦文芳']!.birthday!.calendar, BirthdayCalendar.solar);
+      expect(byName['二姐']!.birthday!.calendar, BirthdayCalendar.lunar);
     });
 
     widgetTest('点导入后 11 位全部进来，并且回到联系人页', (WidgetTester tester) async {
@@ -286,10 +330,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('11 位可导入'), findsOneWidget);
 
-      await tester.ensureVisible(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
+      await tapImportButton(tester);
 
       expect(harness.contactController.contacts, hasLength(11));
       // 导入后要切到「联系人」页

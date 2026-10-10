@@ -13,6 +13,7 @@ import '../navigation.dart';
 import '../widgets/birthday_facts.dart';
 import '../widgets/common.dart';
 import '../widgets/contact_text_help.dart';
+import '../widgets/forms.dart';
 
 /// 一条解析结果与已有联系人的关系。
 enum _DuplicateKind {
@@ -43,6 +44,10 @@ class _ContactImportPageState extends State<ContactImportPage> {
   bool _importing = false;
   bool _seeded = false;
 
+  /// 逐条的历法选择（用户要求：默认农历，新历自己手动改）。
+  /// 只对「文本里没写历法」的那些条目生效。
+  final Map<int, BirthdayCalendar> _calendarOf = <int, BirthdayCalendar>{};
+
   @override
   void dispose() {
     _text.dispose();
@@ -71,13 +76,44 @@ class _ContactImportPageState extends State<ContactImportPage> {
   void _reparse(BirthdayCalendar calendar) {
     setState(() {
       _parsed = ContactTextParser(defaultCalendar: calendar).parse(_text.text);
+      _calendarOf.clear();
+    });
+  }
+
+  /// 界面和导入都用这一份：把逐条选择应用上去。
+  List<ParsedContact> get _effective {
+    final List<ParsedContact> result = <ParsedContact>[];
+    for (int i = 0; i < _parsed.length; i++) {
+      final ParsedContact parsed = _parsed[i];
+      final BirthdayCalendar? chosen = _calendarOf[i];
+      if (parsed.birthdayCalendarFromText ||
+          chosen == null ||
+          parsed.birthday == null) {
+        result.add(parsed);
+      } else {
+        result.add(parsed.withCalendar(chosen));
+      }
+    }
+    return result;
+  }
+
+  void _setCalendar(int index, BirthdayCalendar calendar) {
+    setState(() => _calendarOf[index] = calendar);
+  }
+
+  /// 一键把**所有没写历法**的条目改成同一种。
+  void _setCalendarForAll(BirthdayCalendar calendar) {
+    setState(() {
+      for (int i = 0; i < _parsed.length; i++) {
+        if (!_parsed[i].birthdayCalendarFromText) _calendarOf[i] = calendar;
+      }
     });
   }
 
   void _onChanged(String value) => _reparse(_currentCalendar);
 
   List<ParsedContact> get _valid =>
-      _parsed.where((ParsedContact c) => c.isValid).toList();
+      _effective.where((ParsedContact c) => c.isValid).toList();
 
   _DuplicateKind _kindOf(ParsedContact parsed, ContactController controller) {
     final Contact probe = parsed.toContact(id: '_probe', now: controller.now);
@@ -156,16 +192,17 @@ class _ContactImportPageState extends State<ContactImportPage> {
   Widget build(BuildContext context) {
     final ContactController controller = context.watch<ContactController>();
     final BirthdayCalendar calendar = _defaultCalendar;
+    final List<ParsedContact> items = _effective;
     final List<ParsedContact> valid = _valid;
     final List<_DuplicateKind> kinds = <_DuplicateKind>[
-      for (final ParsedContact parsed in _parsed)
+      for (final ParsedContact parsed in items)
         parsed.isValid ? _kindOf(parsed, controller) : _DuplicateKind.fresh,
     ];
     final int mergeCount = kinds
         .where((_DuplicateKind k) => k == _DuplicateKind.identical)
         .length;
     final int newCount = valid.length - mergeCount;
-    final int invalidCount = _parsed.length - valid.length;
+    final int invalidCount = items.length - valid.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -283,15 +320,49 @@ class _ContactImportPageState extends State<ContactImportPage> {
                 invalid: invalidCount,
               ),
             ),
-            for (int i = 0; i < _parsed.length; i++)
+            // 一键全改：默认农历，新历可以一次性全切过去
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: <Widget>[
+                const Text(
+                  '没写历法的按：',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                SelectableChip(
+                  key: const Key('bulkCalendar-lunar'),
+                  label: '全部农历',
+                  dense: true,
+                  selected: false,
+                  onTap: () => _setCalendarForAll(BirthdayCalendar.lunar),
+                ),
+                SelectableChip(
+                  key: const Key('bulkCalendar-solar'),
+                  label: '全部新历',
+                  dense: true,
+                  selected: false,
+                  onTap: () => _setCalendarForAll(BirthdayCalendar.solar),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            for (int i = 0; i < items.length; i++)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _PreviewCard(
-                  parsed: _parsed[i],
+                  parsed: items[i],
                   index: i,
                   kind: kinds[i],
                   calculator: controller.calculator,
                   now: controller.now,
+                  defaultCalendar: calendar,
+                  fromText: _parsed[i].birthdayCalendarFromText,
+                  onCalendar: (BirthdayCalendar value) =>
+                      _setCalendar(i, value),
                 ),
               ),
             const SizedBox(height: 6),
@@ -331,6 +402,9 @@ class _PreviewCard extends StatelessWidget {
     required this.kind,
     required this.calculator,
     required this.now,
+    required this.defaultCalendar,
+    required this.fromText,
+    required this.onCalendar,
   });
 
   final ParsedContact parsed;
@@ -338,6 +412,14 @@ class _PreviewCard extends StatelessWidget {
   final _DuplicateKind kind;
   final BirthdayCalculator calculator;
   final DateTime now;
+
+  /// 页面默认历法（逐条按钮里高亮当前选择）。
+  final BirthdayCalendar defaultCalendar;
+
+  /// 文本里是否已经写明历法（写了就不给切）。
+  final bool fromText;
+
+  final ValueChanged<BirthdayCalendar> onCalendar;
 
   @override
   Widget build(BuildContext context) {
@@ -384,6 +466,54 @@ class _PreviewCard extends StatelessWidget {
             _line('关系', parsed.relationshipLabelPreview),
             if (parsed.birthday != null) ...<Widget>[
               _line('生日', parsed.birthday!.displayLabel),
+              const SizedBox(height: 8),
+              if (fromText)
+                Row(
+                  children: <Widget>[
+                    const Icon(
+                      Icons.lock_outline_rounded,
+                      size: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '文本里写了${parsed.birthday!.calendar.label}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: <Widget>[
+                    const Text(
+                      '按：',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    SelectableChip(
+                      key: Key('rowCalendar-lunar-$index'),
+                      label: '农历',
+                      dense: true,
+                      selected:
+                          parsed.birthday!.calendar == BirthdayCalendar.lunar,
+                      onTap: () => onCalendar(BirthdayCalendar.lunar),
+                    ),
+                    const SizedBox(width: 6),
+                    SelectableChip(
+                      key: Key('rowCalendar-solar-$index'),
+                      label: '新历',
+                      dense: true,
+                      selected:
+                          parsed.birthday!.calendar == BirthdayCalendar.solar,
+                      onTap: () => onCalendar(BirthdayCalendar.solar),
+                    ),
+                  ],
+                ),
               const SizedBox(height: 8),
               BirthdayFacts(
                 birthday: parsed.birthday!,

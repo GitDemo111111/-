@@ -168,10 +168,7 @@ void main() {
       await pumpImport(tester, harness);
 
       await paste(tester, kContactTextExample);
-      await tester.ensureVisible(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
+      await tapImportButton(tester);
 
       expect(harness.contactController.contacts, hasLength(1));
       final Contact saved = harness.contactController.contacts.single;
@@ -198,10 +195,7 @@ void main() {
       await paste(tester, '姓名：张三\n生日：新历5月20日\n\n姓名：李四\n生日：农历八月十五\n\n姓名：王五');
       expect(find.text('3 位可导入'), findsOneWidget);
 
-      await tester.ensureVisible(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
+      await tapImportButton(tester);
 
       expect(harness.contactController.contacts, hasLength(3));
       final Contact lunar = harness.contactController.contacts.firstWhere(
@@ -220,10 +214,7 @@ void main() {
       await pumpImport(tester, harness);
 
       await paste(tester, '姓名：张三\n生日：新历5月23日');
-      await tester.ensureVisible(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('doImportButton')));
-      await tester.pumpAndSettle();
+      await tapImportButton(tester);
 
       expect(harness.contactController.upcoming, hasLength(1));
       expect(harness.contactController.visibleContacts, hasLength(1));
