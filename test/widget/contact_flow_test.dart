@@ -1,4 +1,3 @@
-import 'package:birthday_keeper/models/app_settings.dart';
 import 'package:birthday_keeper/models/birthday.dart';
 import 'package:birthday_keeper/models/contact.dart';
 import 'package:birthday_keeper/models/relationship.dart';
