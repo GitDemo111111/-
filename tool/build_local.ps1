@@ -99,7 +99,14 @@ foreach ($apk in $apks) {
 
     $target = Join-Path $OutputDir "生日管家-v$versionName$abi.apk"
     Copy-Item $apk.FullName $target -Force
-    Copy-Item $apk.FullName (Join-Path $OutputDir 'app-release.apk') -Force
+    # 只有「通用包」或「arm64 包」才写不带架构后缀的名字。
+    # 否则 x86_64 / arm32 会依次覆盖同一个文件，装的时候就会装错架构
+    # （表现为 INSTALL_FAILED_NO_MATCHING_ABIS）。
+    $primary = (-not $SplitPerAbi) -or ($apk.Name -match 'arm64-v8a')
+    if ($primary) {
+        Copy-Item $apk.FullName (Join-Path $OutputDir 'app-release.apk') -Force
+        Copy-Item $apk.FullName (Join-Path $OutputDir "生日管家-v$versionName.apk") -Force
+    }
 
     $badging = & $aapt2 dump badging $apk.FullName 2>&1 |
         Select-String -Pattern "^package:" | Select-Object -First 1
@@ -115,14 +122,26 @@ if ($Install) {
     if (-not $devices) {
         Write-Host "没有检测到已连接的手机（adb devices 为空），跳过安装。" -ForegroundColor Yellow
     } else {
-        $target = Join-Path $OutputDir "生日管家-v$versionName.apk"
+        # 按手机真实架构挑包，避免把 x86_64 的包装到 arm 手机上
+        $phoneAbi = (& $adb shell getprop ro.product.cpu.abi | Out-String).Trim()
+        $abiSuffix = if ($phoneAbi -match 'arm64') { '-arm64' }
+                     elseif ($phoneAbi -match 'armeabi') { '-arm32' }
+                     else { '' }
+        Write-Host "    手机架构: $phoneAbi  ->  用后缀 '$abiSuffix'"
+        $target = Join-Path $OutputDir "生日管家-v$versionName$abiSuffix.apk"
+        if (-not (Test-Path $target)) { $target = Join-Path $OutputDir "生日管家-v$versionName.apk" }
         if (-not (Test-Path $target)) { $target = (Get-ChildItem (Join-Path $OutputDir '*.apk') | Select-Object -First 1).FullName }
         Write-Step "安装到手机：$target"
-        & $adb install -r $target
+        $installOut = & $adb install -r $target 2>&1
+        $installOut | ForEach-Object { Write-Host "    $_" }
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "覆盖安装失败（多半是签名不同）。保留数据重装：" -ForegroundColor Yellow
-            & $adb shell pm uninstall -k --user 0 com.birthdaykeeper.birthday_keeper
-            & $adb install $target
+            if ($installOut -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE|signatures do not match|INSTALL_PARSE_FAILED') {
+                Write-Host "覆盖安装失败（签名不同）。保留应用数据重装：" -ForegroundColor Yellow
+                & $adb shell pm uninstall -k --user 0 com.birthdaykeeper.birthday_keeper | Out-Null
+                & $adb install $target | ForEach-Object { Write-Host "    $_" }
+            } else {
+                Write-Host "安装失败，手机上的旧版本没有被动过。请看上面的错误。" -ForegroundColor Red
+            }
         }
         & $adb shell dumpsys package com.birthdaykeeper.birthday_keeper |
             Select-String -Pattern 'versionName|versionCode' | Select-Object -First 2 |
