@@ -51,13 +51,20 @@ $flutter = Join-Path $FlutterSdk 'bin\flutter.bat'
 if (-not (Test-Path $flutter)) { throw "找不到 Flutter SDK：$flutter" }
 
 $log = Join-Path $BuildRoot 'build_local.log'
-$args = @('build', 'apk', '--release', '--android-skip-build-dependency-validation')
-if ($SplitPerAbi) { $args += '--split-per-abi' }
+$buildArgs = @('build', 'apk', '--release', '--android-skip-build-dependency-validation')
+if ($SplitPerAbi) { $buildArgs += '--split-per-abi' }
 
 Write-Step "构建 Release APK（日志：$log）"
+# 不能写成 `& $flutter @buildArgs *> $log`：flutter.bat 会往 stderr 打一行
+# 仓库提示，而 $ErrorActionPreference='Stop' 会把原生命令的 stderr 当终止错误，
+# 脚本会在构建刚开始时直接退出。交给 cmd 重定向最省事。
+$quotedArgs = ($buildArgs | ForEach-Object {
+    if ($_ -match '\s') { '"' + $_ + '"' } else { $_ }
+}) -join ' '
+$commandLine = '"' + $flutter + '" ' + $quotedArgs + ' > "' + $log + '" 2>&1'
 Push-Location $BuildRoot
 try {
-    & $flutter @args *> $log 2>&1
+    cmd /c $commandLine
     $code = $LASTEXITCODE
 } finally {
     Pop-Location

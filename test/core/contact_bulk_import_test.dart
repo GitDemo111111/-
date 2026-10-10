@@ -1,6 +1,7 @@
 import 'package:birthday_keeper/core/contact_text_parser.dart';
 import 'package:birthday_keeper/models/birthday.dart';
 import 'package:birthday_keeper/models/contact.dart';
+import 'package:birthday_keeper/state/root_tab_controller.dart';
 import 'package:birthday_keeper/ui/pages/contact_import_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -113,6 +114,40 @@ void main() {
     });
   });
 
+  /// 用户真实粘贴的数据（原样），用于回归。
+  const String kUserRealData = '''
+姓名: 秦文芳
+生日: 1972-09-18
+
+姓名: 陈光华
+生日: 1969-09-25
+
+姓名: 陈光兰
+生日: 年份不详-10-29
+
+姓名: 二姐
+生日: 年份不详-农历02-20
+
+姓名: 大姐
+生日: 年份不详-农历03-17（新历04-28）
+
+姓名: 陈光书
+生日: 年份不详-农历04-03
+
+姓名: 七靓鹅公
+生日: 年份不详-农历12-22
+
+姓名: 陈大荣
+生日: 1949-06-29
+
+姓名: 赵书研
+生日: 年份不详-农历05-10
+
+姓名: 胡连福
+生日: 1949-04-09
+
+姓名: 陈大容
+生日: 1949-06-29''';
   group('界面：一次导入 11 位', () {
     Future<void> pump(WidgetTester tester, TestHarness harness) async {
       await tester.pumpWidget(harness.wrap(const ContactImportPage()));
@@ -175,6 +210,90 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(harness.contactController.contacts, hasLength(11));
+    });
+  });
+  group('用户真实数据的 11 位', () {
+    test('解析出 11 条', () {
+      final List<ParsedContact> all = parser.parse(kUserRealData);
+      expect(
+        all,
+        hasLength(11),
+        reason:
+            '实际解析出 ${all.length} 条：${all.map((ParsedContact c) => c.name).toList()}',
+      );
+      expect(all.map((ParsedContact c) => c.name).toList(), <String>[
+        '秦文芳',
+        '陈光华',
+        '陈光兰',
+        '二姐',
+        '大姐',
+        '陈光书',
+        '七靓鹅公',
+        '陈大荣',
+        '赵书研',
+        '胡连福',
+        '陈大容',
+      ]);
+    });
+
+    test('新历日期按新历，写农历的按农历', () {
+      final List<ParsedContact> all = parser.parseValid(kUserRealData);
+      expect(all, hasLength(11));
+      final Map<String, ParsedContact> byName = <String, ParsedContact>{
+        for (final ParsedContact c in all) c.name: c,
+      };
+      // 1972-09-18 这种 ISO 写法是新历
+      expect(
+        byName['秦文芳']!.birthday,
+        const Birthday(year: 1972, month: 9, day: 18),
+      );
+      expect(
+        byName['陈光华']!.birthday,
+        const Birthday(year: 1969, month: 9, day: 25),
+      );
+      expect(
+        byName['胡连福']!.birthday,
+        const Birthday(year: 1949, month: 4, day: 9),
+      );
+      // 「年份不详-10-29」：年份没有，也不该被当成农历
+      expect(byName['陈光兰']!.birthday!.calendar, BirthdayCalendar.solar);
+      expect(byName['陈光兰']!.birthday!.month, 10);
+      expect(byName['陈光兰']!.birthday!.day, 29);
+      expect(byName['陈光兰']!.birthday!.year, isNull);
+      // 明确写农历的
+      expect(byName['二姐']!.birthday!.calendar, BirthdayCalendar.lunar);
+      expect(byName['二姐']!.birthday!.month, 2);
+      expect(byName['二姐']!.birthday!.day, 20);
+      // 农历 + 括号里备注新历：取农历那一半
+      expect(byName['大姐']!.birthday!.calendar, BirthdayCalendar.lunar);
+      expect(byName['大姐']!.birthday!.month, 3);
+      expect(byName['大姐']!.birthday!.day, 17);
+      expect(byName['七靓鹅公']!.birthday!.calendar, BirthdayCalendar.lunar);
+      expect(byName['七靓鹅公']!.birthday!.month, 12);
+      expect(byName['七靓鹅公']!.birthday!.day, 22);
+    });
+
+    widgetTest('点导入后 11 位全部进来，并且回到联系人页', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      await tester.pumpWidget(harness.wrap(const ContactImportPage()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('importTextField')),
+        kUserRealData,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('11 位可导入'), findsOneWidget);
+
+      await tester.ensureVisible(find.byKey(const Key('doImportButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('doImportButton')));
+      await tester.pumpAndSettle();
+
+      expect(harness.contactController.contacts, hasLength(11));
+      // 导入后要切到「联系人」页
+      expect(harness.rootTabController.index, RootTabController.contactsTab);
     });
   });
 }

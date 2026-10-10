@@ -6,6 +6,7 @@ import '../../core/contact_text_parser.dart';
 import '../../models/birthday.dart';
 import '../../models/contact.dart';
 import '../../state/contact_controller.dart';
+import '../../state/root_tab_controller.dart';
 import '../../state/settings_controller.dart';
 import '../../theme/app_theme.dart';
 import '../navigation.dart';
@@ -122,6 +123,8 @@ class _ContactImportPageState extends State<ContactImportPage> {
     if (merged > 0) message.write('，合并 $merged 位重复的');
     if (duplicated > 0) message.write('，$duplicated 位同名但信息不同');
     showAppSnackBar(context, message.toString());
+    // 导入完切到「联系人」页，保证不管从哪个入口进来都能看到刚导入的人
+    context.read<RootTabController>().goToContacts();
     Navigator.of(context).pop();
   }
 

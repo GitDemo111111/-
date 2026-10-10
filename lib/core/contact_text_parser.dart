@@ -123,7 +123,7 @@ class ParsedContact {
 /// 目标是让人把微信里收到的信息直接粘进来就能用，所以尽量容错：
 /// 标签有别名、冒号全角半角都行、日期多种写法、多个人用空行或 `---` 隔开。
 class ContactTextParser {
-  const ContactTextParser({this.defaultCalendar = BirthdayCalendar.lunar});
+  const ContactTextParser({this.defaultCalendar = BirthdayCalendar.solar});
 
   /// 文本里没写明历法时，按哪种历法理解。
   ///
@@ -134,9 +134,16 @@ class ContactTextParser {
   /// 解析文本，返回所有解析出来的条目（含缺姓名的无效条目）。
   List<ParsedContact> parse(String text) {
     final List<List<String>> blocks = _splitBlocks(text);
+    // 文档级推断：这段文本里出现过「农历」字样，说明作者会显式标注农历，
+    // 那么**没标注**的日期就按新历理解（否则 1972-09-18 这种 ISO 写法会被误当农历）。
+    final bool marksLunar = RegExp(r'农历|阴历|旧历|農曆').hasMatch(text);
+    final BirthdayCalendar fallback = marksLunar
+        ? BirthdayCalendar.solar
+        : defaultCalendar;
+
     final List<ParsedContact> result = <ParsedContact>[];
     for (final List<String> block in blocks) {
-      result.addAll(_parseBlockEntries(block));
+      result.addAll(_parseBlockEntries(block, fallback));
     }
     return result;
   }
@@ -215,10 +222,13 @@ class ContactTextParser {
   // ------------------------------------------------------------ 解析单块
 
   /// 解析一个块，可能得到**多条**（例如微信里很常见的「一行一位」名单）。
-  List<ParsedContact> _parseBlockEntries(List<String> lines) {
+  List<ParsedContact> _parseBlockEntries(
+    List<String> lines,
+    BirthdayCalendar fallback,
+  ) {
     if (lines.isEmpty) return const <ParsedContact>[];
-    if (!_hasStructuredField(lines)) return _parseLooseEntries(lines);
-    final ParsedContact? one = _parseBlock(lines);
+    if (!_hasStructuredField(lines)) return _parseLooseEntries(lines, fallback);
+    final ParsedContact? one = _parseBlock(lines, fallback);
     return one == null ? const <ParsedContact>[] : <ParsedContact>[one];
   }
 
@@ -241,7 +251,7 @@ class ContactTextParser {
     return false;
   }
 
-  ParsedContact? _parseBlock(List<String> lines) {
+  ParsedContact? _parseBlock(List<String> lines, BirthdayCalendar fallback) {
     if (lines.isEmpty) return null;
 
     String? name;
@@ -281,7 +291,7 @@ class ContactTextParser {
         if (label.isEmpty) {
           // 没有冒号的行：可能夹带日期，先试着当生日。
           final Birthday? maybeDate = birthday == null
-              ? _parseBirthday(line, explicitCalendar ?? defaultCalendar)
+              ? _parseBirthday(line, explicitCalendar ?? fallback)
               : null;
           if (maybeDate != null) {
             birthday = maybeDate;
@@ -315,7 +325,7 @@ class ContactTextParser {
           if (trimmed.isEmpty) break;
           final Birthday? parsed = _parseBirthday(
             trimmed,
-            explicitCalendar ?? defaultCalendar,
+            explicitCalendar ?? fallback,
           );
           if (parsed == null) {
             warnings.add('没看懂生日「$trimmed」，请手动选择');
@@ -368,7 +378,10 @@ class ContactTextParser {
   }
 
   /// 没有任何已知标签时的宽松解析。
-  ParsedContact? _parseLooseBlock(List<String> lines) {
+  ParsedContact? _parseLooseBlock(
+    List<String> lines,
+    BirthdayCalendar fallback,
+  ) {
     final List<String> remaining = <String>[];
     String? name;
     Birthday? birthday;
@@ -378,7 +391,7 @@ class ContactTextParser {
       if (name == null) {
         // 第一行当姓名；但如果它本身就是一个日期，就当作生日，
         // 避免把「5月20日」这样的行误当成名字。
-        final Birthday? asDate = _parseBirthday(line, defaultCalendar);
+        final Birthday? asDate = _parseBirthday(line, fallback);
         if (asDate != null && asDate.validate() == null) {
           birthday ??= asDate;
           continue;
@@ -391,7 +404,7 @@ class ContactTextParser {
         }
       }
       if (birthday == null) {
-        final Birthday? parsed = _parseBirthday(line, defaultCalendar);
+        final Birthday? parsed = _parseBirthday(line, fallback);
         if (parsed != null && parsed.validate() == null) {
           birthday = parsed;
           continue;
@@ -423,7 +436,10 @@ class ContactTextParser {
   /// 关键分支：如果里面有**多行各自带日期**，那多半是微信里常见的名单
   /// （`张三 5月20日` / `张三,5月20日` / `张三：5月20日` / 姓名一行日期一行），
   /// 这时按「一行一位」拆开，而不是把 11 个人当成 1 个人。
-  List<ParsedContact> _parseLooseEntries(List<String> lines) {
+  List<ParsedContact> _parseLooseEntries(
+    List<String> lines,
+    BirthdayCalendar fallback,
+  ) {
     final List<String> items = lines
         .map((String l) => l.trim())
         .where((String l) => l.isNotEmpty)
@@ -456,19 +472,22 @@ class ContactTextParser {
         .where((List<String> g) => g.any((String l) => _dateMatch(l) != null))
         .length;
     if (datedGroups < 2) {
-      final ParsedContact? single = _parseLooseBlock(lines);
+      final ParsedContact? single = _parseLooseBlock(lines, fallback);
       return single == null ? const <ParsedContact>[] : <ParsedContact>[single];
     }
 
     final List<ParsedContact> result = <ParsedContact>[];
     for (final List<String> group in groups) {
-      result.add(_parseLooseGroup(group));
+      result.add(_parseLooseGroup(group, fallback));
     }
     return result;
   }
 
   /// 把「一位联系人」的那一小段文本解析出来。
-  ParsedContact _parseLooseGroup(List<String> group) {
+  ParsedContact _parseLooseGroup(
+    List<String> group,
+    BirthdayCalendar fallback,
+  ) {
     String? name;
     Birthday? birthday;
     String? phone;
@@ -478,7 +497,7 @@ class ContactTextParser {
     for (final String line in group) {
       final Match? dateMatch = _dateMatch(line);
       if (dateMatch != null && birthday == null) {
-        final Birthday? parsed = _parseBirthday(line, defaultCalendar);
+        final Birthday? parsed = _parseBirthday(line, fallback);
         if (parsed != null && parsed.validate() == null) {
           birthday = parsed;
           final String before = line

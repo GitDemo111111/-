@@ -44,6 +44,24 @@ $apk = Get-Item $ApkPath
 $sizeMb = [math]::Round($apk.Length / 1MB, 1)
 $sha256 = (Get-FileHash $apk.FullName -Algorithm SHA256).Hash
 
+# 共享前先验签名：用多线程分片下载拼出来的 APK 表面看没问题，
+# 但手机安装会报 INSTALL_PARSE_FAILED_NO_CERTIFICATES。
+$sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { 'C:\Users\feasycom\dev\android-sdk' }
+$bt = Get-ChildItem (Join-Path $sdkRoot 'build-tools') -Directory -ErrorAction SilentlyContinue |
+    Sort-Object Name -Descending | Select-Object -First 1
+if ($bt) {
+    $signer = Join-Path $bt.FullName 'apksigner.bat'
+    if (Test-Path $signer) {
+        & $signer verify $apk.FullName *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "!! 这个 APK 签名校验失败，文件可能已损坏，别急着装：$($apk.FullName)" -ForegroundColor Red
+            Write-Host "   重新构建：pwsh -File tool\build_local.ps1" -ForegroundColor Yellow
+        } else {
+            Write-Host "签名校验：通过" -ForegroundColor Green
+        }
+    }
+}
+
 # 分享目录：保持 ASCII 文件名，避免手机上出现乱码
 $shareDir = Join-Path $env:TEMP 'birthday_keeper_share'
 if (Test-Path $shareDir) { Remove-Item $shareDir -Recurse -Force }

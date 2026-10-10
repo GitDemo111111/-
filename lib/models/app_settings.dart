@@ -32,7 +32,7 @@ class AppSettings {
     this.groupUpcoming = true,
     this.showTipCard = true,
     this.hiddenTipIds = const <String>[],
-    this.importCalendar = BirthdayCalendar.lunar,
+    this.importCalendar = BirthdayCalendar.solar,
   });
 
   /// 总开关：关闭后不再调度任何通知。
@@ -55,7 +55,10 @@ class AppSettings {
   /// 被用户「不再提示」的提示 id。
   final List<String> hiddenTipIds;
 
-  /// 文本导入时，没有写明历法的日期按哪种历法理解（默认农历）。
+  /// 文本导入时，没有写明历法的日期按哪种历法理解（默认新历）。
+  ///
+  /// 另外解析器还有一条「文档级推断」：整段文本只要出现过「农历」字样，
+  /// 没标注的日期就按新历算 —— 因为会写「农历」的人一定是显式标注的。
   final BirthdayCalendar importCalendar;
 
   bool isTipHidden(String id) => hiddenTipIds.contains(id);

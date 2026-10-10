@@ -237,48 +237,46 @@ void main() {
   });
 
   group('默认历法开关', () {
-    widgetTest('默认农历：没写历法按农历解析', (WidgetTester tester) async {
+    widgetTest('默认新历：没写历法按新历解析', (WidgetTester tester) async {
       final TestHarness harness = TestHarness();
       await harness.load();
       await pumpImport(tester, harness);
 
-      // 设置里的默认值就是农历
+      // 设置里的默认值是新历（用户真实数据里农历都会显式标注）
+      expect(
+        harness.settingsController.settings.importCalendar,
+        BirthdayCalendar.solar,
+      );
+
+      await paste(tester, '姓名：张三\n生日：5月20日');
+      expect(find.text('5月20日'), findsWidgets);
+    });
+
+    widgetTest('切到农历后立即重新解析并记住设置', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      await pumpImport(tester, harness);
+
+      await paste(tester, '姓名：张三\n生日：5月20日');
+      expect(find.text('农历5月20日'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('importCalendar-lunar')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('农历5月20日'), findsWidgets);
       expect(
         harness.settingsController.settings.importCalendar,
         BirthdayCalendar.lunar,
       );
-
-      await paste(tester, '姓名：张三\n生日：5月20日');
-      expect(find.text('农历5月20日'), findsWidgets);
-    });
-
-    widgetTest('切到新历后立即重新解析并记住设置', (WidgetTester tester) async {
-      final TestHarness harness = TestHarness();
-      await harness.load();
-      await pumpImport(tester, harness);
-
-      await paste(tester, '姓名：张三\n生日：5月20日');
-      expect(find.text('农历5月20日'), findsWidgets);
-
-      await tester.tap(find.byKey(const Key('importCalendar-solar')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('5月20日'), findsOneWidget);
-      expect(
-        harness.settingsController.settings.importCalendar,
-        BirthdayCalendar.solar,
-      );
       // 设置写回了仓库
       expect(
         (await harness.settingsRepository.load()).importCalendar,
-        BirthdayCalendar.solar,
+        BirthdayCalendar.lunar,
       );
     });
 
     widgetTest('文本里写了农历就以文本为准', (WidgetTester tester) async {
-      final TestHarness harness = TestHarness(
-        settings: const AppSettings(importCalendar: BirthdayCalendar.solar),
-      );
+      final TestHarness harness = TestHarness();
       await harness.load();
       await pumpImport(tester, harness);
 
