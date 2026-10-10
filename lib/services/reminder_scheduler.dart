@@ -25,10 +25,16 @@ abstract class ReminderScheduler {
 ///
 /// 用于测试，也可以作为「通知总开关关闭」时的降级实现。
 class NoopReminderScheduler implements ReminderScheduler {
-  NoopReminderScheduler({this.permissionGranted = true});
+  NoopReminderScheduler({
+    this.permissionGranted = true,
+    this.failOnApply = false,
+  });
 
   /// [requestPermission] 的返回值。
   bool permissionGranted;
+
+  /// 让 [apply] 抛异常，用来验证「通知排程失败不能影响联系人数据」。
+  bool failOnApply;
 
   /// 最近一次 [apply] 收到的提醒。
   List<PendingReminder> applied = <PendingReminder>[];
@@ -45,6 +51,9 @@ class NoopReminderScheduler implements ReminderScheduler {
   @override
   Future<void> apply(List<PendingReminder> reminders) async {
     applyCount++;
+    if (failOnApply) {
+      throw StateError('排程失败（测试用）');
+    }
     applied = List<PendingReminder>.of(reminders);
   }
 

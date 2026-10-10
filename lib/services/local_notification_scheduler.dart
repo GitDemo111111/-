@@ -139,24 +139,39 @@ class LocalNotificationScheduler implements ReminderScheduler {
   @override
   Future<void> apply(List<PendingReminder> reminders) async {
     await initialize();
-    await _plugin.cancelAll();
+    // 通知排程**绝不能影响数据保存**：这里所有调用都吃掉异常。
+    // 之前没有 try/catch，某些机型（如 MIUI）某一条排程失败就会把
+    // 「批量导入」整个中断，最后只存进去前两条。
+    try {
+      await _plugin.cancelAll();
+    } catch (_) {
+      // 忽略：取消失败不影响后面的重新排程
+    }
     for (final PendingReminder reminder in reminders) {
-      await _plugin.zonedSchedule(
-        id: reminder.id,
-        title: reminder.title,
-        body: reminder.body,
-        scheduledDate: tz.TZDateTime.from(reminder.scheduledAt, tz.local),
-        notificationDetails: _details,
-        androidScheduleMode: scheduleMode,
-        payload: reminder.payload,
-      );
+      try {
+        await _plugin.zonedSchedule(
+          id: reminder.id,
+          title: reminder.title,
+          body: reminder.body,
+          scheduledDate: tz.TZDateTime.from(reminder.scheduledAt, tz.local),
+          notificationDetails: _details,
+          androidScheduleMode: scheduleMode,
+          payload: reminder.payload,
+        );
+      } catch (_) {
+        // 单条失败就跳过，别让整批中断
+      }
     }
   }
 
   @override
   Future<void> cancelAll() async {
     await initialize();
-    await _plugin.cancelAll();
+    try {
+      await _plugin.cancelAll();
+    } catch (_) {
+      // 忽略
+    }
   }
 
   @override

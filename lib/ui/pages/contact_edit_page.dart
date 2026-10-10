@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -327,15 +329,16 @@ class _ContactEditPageState extends State<ContactEditPage> {
       await controller.addContact(contact);
     }
 
-    if (contact.reminder.enabled && controller.settings.notificationsEnabled) {
-      await controller.requestNotificationPermission();
-    }
     if (!mounted) return;
 
     showAppSnackBar(context, _isEditing ? '已保存' : '已添加 ${contact.name}');
     // 保存后自动回到「联系人」页，方便立刻看到刚保存的人
     context.read<RootTabController>().goToContacts();
     Navigator.of(context).pop();
+    // 通知权限弹窗放在导航之后：不能让系统弹窗把用户卡在编辑页
+    if (contact.reminder.enabled && controller.settings.notificationsEnabled) {
+      unawaited(controller.requestNotificationPermission());
+    }
   }
 
   @override

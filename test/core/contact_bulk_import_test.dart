@@ -51,6 +51,32 @@ void main() {
     return buffer.toString();
   }
 
+  /// 从一个「首页」push 进导入页，这样导入完成后的 pop 走的是真实路径。
+  Future<void> openImportPage(WidgetTester tester, TestHarness harness) async {
+    await tester.pumpWidget(
+      harness.wrap(
+        Builder(
+          builder: (BuildContext context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                key: const Key('openImportPage'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext _) => const ContactImportPage(),
+                  ),
+                ),
+                child: const Text('从文本导入'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('openImportPage')));
+    await tester.pumpAndSettle();
+  }
+
   group('解析：一次 11 位', () {
     test('标准格式（姓名：/ 生日：）', () {
       final String text = build(
@@ -155,7 +181,6 @@ void main() {
     }
 
     widgetTest('点击导入按钮后 11 位都在', (WidgetTester tester) async {
-      // 11 张卡片比较高，用更高的测试视口，避免 ListView 懒加载看不到最后一张
       final TestHarness harness = TestHarness();
       await harness.load();
       await pump(tester, harness);
@@ -320,8 +345,7 @@ void main() {
     widgetTest('点导入后 11 位全部进来，并且回到联系人页', (WidgetTester tester) async {
       final TestHarness harness = TestHarness();
       await harness.load();
-      await tester.pumpWidget(harness.wrap(const ContactImportPage()));
-      await tester.pumpAndSettle();
+      await openImportPage(tester, harness);
 
       await tester.enterText(
         find.byKey(const Key('importTextField')),
@@ -335,6 +359,113 @@ void main() {
       expect(harness.contactController.contacts, hasLength(11));
       // 导入后要切到「联系人」页
       expect(harness.rootTabController.index, RootTabController.contactsTab);
+    });
+  });
+
+  group('导入必须一次全部落库（真机上曾只进来 2 条）', () {
+    test('批量写入只落盘一次、只重排一次通知', () async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      final int savesBefore = harness.contactRepository.saveCount;
+      final int appliesBefore = harness.scheduler.applyCount;
+
+      await harness.contactController.addContacts(<Contact>[
+        for (int i = 0; i < 11; i++)
+          makeContact(
+            id: 'b$i',
+            name: '批量$i',
+            birthday: Birthday(month: 1, day: i + 1),
+          ),
+      ]);
+
+      expect(harness.contactController.contacts, hasLength(11));
+      // 逐条 addContact 的话这里会是 11 次；批量只允许 1 次
+      expect(harness.contactRepository.saveCount - savesBefore, 1);
+      expect(harness.scheduler.applyCount - appliesBefore, 1);
+    });
+
+    test('通知排程抛异常也不能影响数据落盘', () async {
+      final TestHarness harness = TestHarness(failScheduling: true);
+      await harness.load();
+
+      await harness.contactController.addContacts(<Contact>[
+        for (int i = 0; i < 11; i++)
+          makeContact(
+            id: 'c$i',
+            name: '容错$i',
+            birthday: Birthday(month: 2, day: i + 1),
+          ),
+      ]);
+
+      // 排程失败被吃掉，11 条依然保存在内存与仓库里
+      expect(harness.contactController.contacts, hasLength(11));
+      expect(await harness.contactRepository.load(), hasLength(11));
+    });
+
+    widgetTest('排程一直失败时，点导入仍然 11 条 + 回到联系人页', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness(failScheduling: true);
+      await harness.load();
+      await tester.pumpWidget(harness.wrap(const ContactImportPage()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('importTextField')),
+        kUserRealData,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('11 位可导入'), findsOneWidget);
+
+      await tapImportButton(tester);
+
+      expect(
+        harness.contactController.contacts,
+        hasLength(11),
+        reason: '真机上曾因为排程异常只存进去 2 条',
+      );
+      expect(harness.rootTabController.index, RootTabController.contactsTab);
+      expect(find.byType(ContactImportPage), findsNothing);
+    });
+
+    widgetTest('重复导入同一份数据会全部合并，不会重复新增', (WidgetTester tester) async {
+      final TestHarness harness = TestHarness();
+      await harness.load();
+      // 从首页 push 进导入页，这样 pop 才是真实路径
+      await openImportPage(tester, harness);
+      await tester.enterText(
+        find.byKey(const Key('importTextField')),
+        kUserRealData,
+      );
+      await tester.pumpAndSettle();
+      await tapImportButton(tester);
+      expect(harness.contactController.contacts, hasLength(11));
+      // 导入完真的回到了首页（那一页的按钮又出现了）
+      expect(find.byKey(const Key('openImportPage')), findsOneWidget);
+
+      // 再进一次导入页：11 条都应该被判为重复并合并
+      await openImportPage(tester, harness);
+      await tester.enterText(
+        find.byKey(const Key('importTextField')),
+        kUserRealData,
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('11 位重复将合并'), findsOneWidget);
+      // 11 张卡比较高，先把按钮滚出来再断言
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('doImportButton')),
+        400,
+        scrollable: find
+            .descendant(
+              of: find.byType(ListView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      final FilledButton button = tester.widget<FilledButton>(
+        find.byKey(const Key('doImportButton')),
+      );
+      expect(button.onPressed, isNull, reason: '全是重复的，导入按钮应该置灰');
+      expect(harness.contactController.contacts, hasLength(11));
     });
   });
 }

@@ -406,6 +406,22 @@ class ContactController extends ChangeNotifier {
     return prepared;
   }
 
+  /// 批量新增（「从文本导入」用）。
+  ///
+  /// 关键点：只落盘一次、只重排一次提醒。
+  /// 之前导入是循环调用 [addContact]，每加一条都要 cancelAll + 重新排好全部
+  /// 提醒（11 个人 ≈ 500 次插件调用），既慢又脆弱 —— 中间任何一次调用抛错
+  /// 整个导入就中断，用户只看到进来两三个。
+  Future<List<Contact>> addContacts(List<Contact> contacts) async {
+    if (contacts.isEmpty) return const <Contact>[];
+    final List<Contact> prepared = contacts
+        .map<Contact>(_prepare)
+        .toList(growable: false);
+    _contacts = <Contact>[..._contacts, ...prepared];
+    await _persist();
+    return prepared;
+  }
+
   /// 更新联系人；如果 id 不存在就当作新增（upsert）。
   Future<Contact> updateContact(Contact contact) async {
     final Contact prepared = _prepare(contact);
@@ -547,7 +563,11 @@ class ContactController extends ChangeNotifier {
       now: _clock(),
     );
     if (scheduler != null) {
-      await scheduler.apply(reminders);
+      try {
+        await scheduler.apply(reminders);
+      } catch (_) {
+        // 通知排程失败不能连累数据（导入 / 保存必须成功）
+      }
       _notificationsAllowed = true;
     }
     _scheduledReminders = reminders;

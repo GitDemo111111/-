@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -137,6 +139,10 @@ class _ContactImportPageState extends State<ContactImportPage> {
     int merged = 0;
     int duplicated = 0;
 
+    // 先收集，再**一次性**批量写入：只落盘一次、只重排一次通知。
+    // （逐条 addContact 会每次重排全部提醒，11 个人约 500 次插件调用，
+    //   既慢又容易在中途出错，导致只进来几条。）
+    final List<Contact> toAdd = <Contact>[];
     for (final ParsedContact parsed in valid) {
       final Contact incoming = parsed.toContact(
         id: controller.newContactId(),
@@ -149,10 +155,10 @@ class _ContactImportPageState extends State<ContactImportPage> {
         continue;
       }
       if (controller.hasSameNameDifferentContent(incoming)) duplicated++;
-      await controller.addContact(incoming);
-      added++;
+      toAdd.add(incoming);
     }
-    await controller.requestNotificationPermission();
+    await controller.addContacts(toAdd);
+    added = toAdd.length;
     if (!mounted) return;
 
     final StringBuffer message = StringBuffer('已导入 $added 位联系人');
@@ -162,6 +168,8 @@ class _ContactImportPageState extends State<ContactImportPage> {
     // 导入完切到「联系人」页，保证不管从哪个入口进来都能看到刚导入的人
     context.read<RootTabController>().goToContacts();
     Navigator.of(context).pop();
+    // 通知权限弹窗放在**导航之后**：不能让系统弹窗把用户卡在这一页
+    unawaited(controller.requestNotificationPermission());
   }
 
   void _fillExample() {

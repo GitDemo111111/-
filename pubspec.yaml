@@ -2,7 +2,7 @@ name: birthday_keeper
 description: "生日管家 —— 记录亲友的生日与关键信息，在生日前 3 天和生日当天提醒你。"
 publish_to: 'none'
 
-version: 1.2.4+7
+version: 1.2.5+8
 
 environment:
   sdk: ^3.12.2

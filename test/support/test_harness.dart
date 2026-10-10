@@ -114,10 +114,14 @@ class TestHarness {
     AppSettings settings = const AppSettings(),
     DateTime? now,
     bool permissionGranted = true,
+    bool failScheduling = false,
   }) : _now = now ?? kNow {
     contactRepository = InMemoryContactRepository(contacts);
     settingsRepository = InMemorySettingsRepository(settings);
-    scheduler = NoopReminderScheduler(permissionGranted: permissionGranted);
+    scheduler = NoopReminderScheduler(
+      permissionGranted: permissionGranted,
+      failOnApply: failScheduling,
+    );
     settingsController = SettingsController(repository: settingsRepository);
     contactController = ContactController(
       repository: contactRepository,

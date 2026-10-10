@@ -12,7 +12,7 @@
 ![生日管家 · 即将到来](docs/screenshot-home-wide.png)
 
 > **CI 实测结果**：`dart format` 无改动 · `flutter analyze` **0 issue** ·
-> `flutter test` **379 个用例全部通过**（行覆盖率 94.2%） ·
+> `flutter test` **383 个用例全部通过**（行覆盖率 94.2%） ·
 > Release **APK / AAB 构建成功** · Web 产物构建成功 ·
 > **Android 模拟器上的集成测试通过**。
 > 运行记录：[Actions](https://github.com/GitDemo111111/-/actions)。
@@ -350,7 +350,7 @@ pwsh -ExecutionPolicy Bypass -File tool/serve_apk.ps1
 
 ## 测试
 
-测试分三层，共 **379 个用例**（行覆盖率 **94%+**）。
+测试分三层，共 **383 个用例**（行覆盖率 **94%+**）。
 
 ```bash
 flutter analyze                            # 静态分析（0 issue）
