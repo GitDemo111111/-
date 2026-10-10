@@ -50,6 +50,11 @@ $env:JAVA_TOOL_OPTIONS = '-Dfile.encoding=UTF-8'
 $flutter = Join-Path $FlutterSdk 'bin\flutter.bat'
 if (-not (Test-Path $flutter)) { throw "找不到 Flutter SDK：$flutter" }
 
+# 清掉上一轮遗留的产物：否则 Get-ChildItem *.apk 会把旧包也当成这次的成果
+# （曾经把上次的 1.2.3 通用包当成新包又复制了一遍）。
+$staleDir = Join-Path $BuildRoot 'build\app\outputs\flutter-apk'
+if (Test-Path $staleDir) { Remove-Item (Join-Path $staleDir '*.apk') -Force -ErrorAction SilentlyContinue }
+
 $log = Join-Path $BuildRoot 'build_local.log'
 $buildArgs = @('build', 'apk', '--release', '--android-skip-build-dependency-validation')
 if ($SplitPerAbi) { $buildArgs += '--split-per-abi' }
@@ -96,6 +101,7 @@ foreach ($apk in $apks) {
     $abi = ''
     if ($apk.Name -match 'arm64-v8a') { $abi = '-arm64' }
     elseif ($apk.Name -match 'armeabi-v7a') { $abi = '-arm32' }
+    elseif ($apk.Name -match 'x86_64') { $abi = '-x86_64' }
 
     $target = Join-Path $OutputDir "生日管家-v$versionName$abi.apk"
     Copy-Item $apk.FullName $target -Force
